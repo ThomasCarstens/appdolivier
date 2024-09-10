@@ -15,6 +15,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// If you need to show notifications when your app is in the foreground
+// Notifications.setNotificationHandler({
+//   handleNotification: async () => ({
+//     shouldShowAlert: true
+//   }),
+// });
 
 async function sendPushNotification(expoPushToken: string) {
   // send push notification and add entry in database

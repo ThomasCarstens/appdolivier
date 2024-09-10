@@ -104,7 +104,7 @@ const RechercheFormationsScreen = ( props, { route } ) => {
       <Text >isAdmin: {isAdmin}</Text>
       <Text >isFormateur: {isFormateur}</Text>
       <Text >isValidated: {isValidated}</Text>
-      <View style={styles.filtersContainer}>
+      {/* <View style={styles.filtersContainer}>
         <View style={styles.pickersContainer}>
           <Picker
             selectedValue={categoryFilter}
@@ -115,7 +115,6 @@ const RechercheFormationsScreen = ( props, { route } ) => {
             <Picker.Item label="Médecine" value="Médecine" />
             <Picker.Item label="Chirurgie" value="Chirurgie" />
             <Picker.Item label="Psychiatrie" value="Psychiatrie" />
-            {/* Add more categories as needed */}
           </Picker>
           <Picker
             selectedValue={lieuFilter}
@@ -126,7 +125,6 @@ const RechercheFormationsScreen = ( props, { route } ) => {
             <Picker.Item label="Paris" value="Paris" />
             <Picker.Item label="Lyon" value="Lyon" />
             <Picker.Item label="Marseille" value="Marseille" />
-            {/* Add more locations as needed */}
           </Picker>
           <Picker
             selectedValue={niveauFilter}
@@ -155,7 +153,7 @@ const RechercheFormationsScreen = ( props, { route } ) => {
       
       <TouchableOpacity style={styles.filterButton} onPress={applyFilters}>
         <Text style={styles.filterButtonText}>Appliquer les filtres</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <FlatList
         data={formations}
