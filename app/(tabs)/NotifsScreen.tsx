@@ -22,6 +22,7 @@ Notifications.setNotificationHandler({
 //   }),
 // });
 
+
 async function sendPushNotification(expoPushToken: string) {
   // send push notification and add entry in database
 
@@ -44,7 +45,7 @@ async function sendPushNotification(expoPushToken: string) {
     body: JSON.stringify(message),
   });
 
-  set(ref_d(database, `solo_notifications/`), {
+  set(ref_d(database, `solo_notifications/${expoPushToken.split('[')[1].split(']')[0]}/date`), {
     to: expoPushToken,
     sound: 'default',
     title: 'Original Title',
@@ -127,6 +128,7 @@ export default function App() {
 
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
+      console.log(notification)
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
