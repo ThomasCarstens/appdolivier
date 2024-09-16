@@ -133,6 +133,9 @@ export default function App() {
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log(response);
+        
+      // set(ref_d(database, `notification-panel/${response.notification.request.content.title}/${auth.currentUser.uid}`), (true));
+
     });
 
     return () => {

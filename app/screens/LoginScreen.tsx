@@ -1,103 +1,99 @@
 import React, { useEffect, useState } from 'react';
-import { View, TextInput, Button, StyleSheet } from 'react-native';
-import { browserLocalPersistence, browserSessionPersistence, getReactNativePersistence, createUserWithEmailAndPassword, setPersistence, signInWithEmailAndPassword } from 'firebase/auth'
-import { auth, firebase, storage, database } from '../../firebase'
-import { StackActions } from '@react-navigation/native';
-import { ref as ref_d, set, get, onValue } from 'firebase/database'
+import { View, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, database } from '../../firebase';
+import { ref as ref_d, onValue } from 'firebase/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(auth.currentUser);
-  const [gameFileContext, setGameFile] =useState({});
-  const [userRoles, setUserRoles] =   useState({});
+  const [loading, setLoading] = useState(true);
+  const [userRoles, setUserRoles] = useState({});
+  const [uid, setUid] = useState('');
 
+  useEffect(() => {
+    auth.onAuthStateChanged(function(user) {
+      checkCachedUser();
+    });
+  }, []);
 
-  // In case user just logged in (place in onLogin section...) - else if already logged in, in App component.
-  React.useMemo(()=>{
-    const userLoggedIn = (auth.currentUser)
+  const checkCachedUser = async () => {
+    try {
+      const cachedUid = await AsyncStorage.getItem('userUid');
+      console.log('cache:', cachedUid)
+      if (cachedUid) {
+        // User UID found in cache, check if still valid
+        const user = auth.currentUser;
 
-    if (userLoggedIn !== null) {
-      // User Roles loaded from Firebase Realtime Database.
-      const gameFileRef = ref_d(database, "userdata/"+String(userLoggedIn.uid) );
-
-      onValue(gameFileRef, (snapshot) =>  {
-            const data = snapshot.val();
-            if (data){
-              console.log('Userdata downloaded in Login.js'+ data.isFormateur)
-              setUserRoles(data)
-
-            }
-          })
-
-      // Automatic login: if there is a current user, based on id.
-      // if (userLoggedIn !== null){
-      //   navigation.replace("Selection", {gameFile: gameFile})
-      //   return
-      // }
+        if (user && user.uid === cachedUid) {
+          // User is still logged in
+          fetchUserRolesAndNavigate(cachedUid);
+        } else {
+          // Cached UID is no longer valid
+          await AsyncStorage.removeItem('userUid');
+          setLoading(false);
+        }
+      } else {
+        // No cached UID found
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error checking cached user:', error);
+      setLoading(false);
     }
+  };
+
+  const fetchUserRolesAndNavigate = (userId) => {
+    const gameFileRef = ref_d(database, `userdata/${userId}`);
     
-      }, [])
-
-
-  // {!isLoggedIn ? () : isAdmin ? () : !isValidated ? () : ()
-  // const handleAutomaticLogin = () => {
-  //   if (isLoggedIn!=null){
-  //   console.log('isLoggedIn: ', isLoggedIn.email)
-  //   {isLoggedIn? navigation.navigate('UserTabs', {isFormateur: 'true', isValidated:'true'}):(null)}
-  //   }
-  // }
-
-  // useEffect(()=>{
-  //   handleAutomaticLogin()
-  // })
-    // navigation.navigate('UserTabs', {role: 'formateur', validated:'true'})}
-
-  // How to reset programmatically?
-
+    onValue(gameFileRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        console.log('Userdata downloaded:', data);
+        setUserRoles(data);
+        navigation.navigate('UserTabs', { userRoles: data, formateur: true, validated: 'true' });
+      } else {
+        // No user data found, log out and show login screen
+        handleLogout();
+      }
+      setLoading(false);
+    });
+  };
 
   const handleLogin = () => {
-    // Implement your login logic here
-    // in login button: onPress={handleLogin} 
-    console.log('Login attempt with:', email, password);
-
-    signInWithEmailAndPassword(auth,email, password)
-    .then(userCredentials => {
+    setLoading(true);
+    signInWithEmailAndPassword(auth, email, password)
+      .then(async (userCredentials) => {
         const user = userCredentials.user;
-        console.log('logged in with:', user.email);
-        
-        
-        const userLoggedIn = (auth.currentUser)
-
-        // if (userLoggedIn !== null) {
-          // User Roles loaded from Firebase Realtime Database.
-          const gameFileRef = ref_d(database, "userdata/"+String(userLoggedIn.uid) );
-    
-          onValue(gameFileRef, (snapshot) =>  {
-                const data = snapshot.val();
-                if (data){
-                  console.log('Userdata downloaded upon Login'+ data.isAdmin)
-                  // setGamerFile(data)
-                  console.log('nav to user tabs')
-                  navigation.navigate('UserTabs', {userRoles: data, formateur: true, validated:'true'})
-                }
-              })
-
-        
-
-    }).catch(error => alert(error.message))  
-
-    
+        console.log('Logged in with:', user.email);
+        // Cache the user's UID
+        await AsyncStorage.setItem('userUid', user.uid);
+        fetchUserRolesAndNavigate(user.uid);
+      })
+      .catch(error => {
+        alert(error.message);
+        setLoading(false);
+      });
   };
 
   const handleLogout = async () => {
-    // await AsyncStorage.clear()
-      auth
-        .signOut()
-        .then(()=> {
-            console.log('Apparently the user signed out')
-            navigation.dispatch(StackActions.popToTop());
-        })
+    try {
+      await auth.signOut();
+      await AsyncStorage.removeItem('userUid');
+      setLoading(false);
+    } catch (error) {
+      console.error('Error logging out:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
   }
 
   return (
@@ -116,8 +112,7 @@ const LoginScreen = ({ navigation }) => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Login" onPress={handleLogin} />    
-      <Button title="Logout" onPress={handleLogout} />  
+      <Button title="Login" onPress={handleLogin} />
       <Button title="Sign Up" onPress={() => navigation.navigate('Signup')} />
       <Button title="Reset Password" onPress={() => navigation.navigate('PasswordReset')} />
       <Button title="Background Info" onPress={() => navigation.navigate('BackgroundInfo')} />
