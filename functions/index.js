@@ -63,53 +63,80 @@ exports.onNewFormation = onValueCreated({
       logger.error('Error calling notification function:', error);
     }
   });
-const {onRequest} = require("firebase-functions/v2/https");
 
 
 
+exports.onNewInscription = onValueCreated({
+  ref: "/demandes/{userUid}/{formationUid}",
+  instance: "appdolivier-default-rtdb",
+  region: "europe-west1"
+}, async (event) => {
+  const userData = event.data.val();
+  const userUid = event.params.userUid;
+  const formationUid = event.params.formationUid;
+  const adminEmail = "thomas.carstens@outlook.com"
+  console.log(userData)
+  if (!userData) {
+    logger.warn("No data associated with the event");
+    return;
+  }
 
-
-
-
-
-// const logger = require("firebase-functions/logger");
-// const {getMessaging} = require("firebase-admin/messaging");
-// exports.sendNotification = onRequest(async (req, res) => {
-//     const {title, body} = req.body;
+  const payload = {
+    title: 'Nouvelle demande d\'inscription',
+    body: `A new inscription to ${formationUid} has been requested.`
     
-//     if (!title || !body) {
-//       logger.warn("Missing title or body in the request");
-//       res.status(400).send("Please provide both title and body for the notification");
-//       return;
-//     }
-  
-//     const message = {
-//       notification: {
-//         title,
-//         body
-//       },
-//       token: "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]"
-//     };
-  
-//     try {
-//       const response = await getMessaging().send(message);
-//       logger.info('Notification sent successfully:', response);
-//       res.status(200).send("Notification sent successfully");
-//     } catch (error) {
-//       logger.error('Error sending notification:', error);
-//       res.status(500).send("Error sending notification");
-//     }
-//   });
+  };
+  //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
+  //https://sendnotification-akam5j3lyq-uc.a.run.app
+  try {
+    const response = await fetch('https://sendbulknotifications-akam5j3lyq-uc.a.run.app/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {'Content-Type': 'application/json'}
+    });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
+    const responseData = await response.text();
+    logger.info('Notification request sent successfully:', responseData);
+  } catch (error) {
+    logger.error('Error calling notification function:', error);
+  }
 
+  // Prepare email payload
+  const emailPayload = {
+    from: 'Administrateur Dumay sur Esculappl <admin-dumay@gmail.com>', 
+    to: userData.email, // to change to user
+    subject: "New Inscription Request",
+    html: `<p style="font-size: 16px;">New Inscription Request:\n
+      User: ${userUid}
+      Formation: ${formationUid}
+      </p>
+      <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+    <br />`, // email content in HTML
+    body: `test body `
+  };
 
-// const {onRequest} = require("firebase-functions/v2/https");
-// const logger = require("firebase-functions/logger");
-// const {getMessaging} = require("firebase-admin/messaging");
-// const {initializeApp} = require("firebase-admin/app");
+  try {
+    // Send email notification
+    const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+      method: 'POST',
+      body: JSON.stringify(emailPayload),
+      headers: {'Content-Type': 'application/json'}
+    });
 
-// initializeApp();
+    if (!emailResponse.ok) {
+      throw new Error(`HTTP error! status: ${emailResponse.status}`);
+    }
+
+    logger.info('Email request sent successfully:', await emailResponse.text());
+  } catch (error) {
+    logger.error('Error calling email function:', error);
+  }
+});
+const {onRequest} = require("firebase-functions/v2/https");
 
 
 exports.sendNotification = onRequest(async (req, res) => {
@@ -248,6 +275,51 @@ exports.sendBulkNotifications = onRequest(async (req, res) => {
     }
   });
 
+
+const cors = require('cors')({origin: true});
+/**
+* Here we're using Gmail to send 
+*/
+
+const nodemailer= require("nodemailer");
+const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          // port: 587,
+          // secure: false, // true for port 465, false for other ports
+          auth: {
+              user: 'thomaxarstens@gmail.com',
+              pass: 'pzic filh fyyy ymkk'
+          }
+        });
+                
+exports.sendMail = onRequest((req, res) => {
+    cors(req, res, () => {
+        console.log(req.body)
+        // getting dest email by query string
+        // const dest = req.query.dest;
+        const mailPayload = req.body;
+        
+        
+
+
+        // const mailOptions = {
+        //     from: 'Administrateur Dumay sur Esculappl <admin-dumay@gmail.com>', // Something like: Jane Doe <janedoe@gmail.com>
+        //     to: dest,
+        //     subject: 'test', // email subject
+        //     html: `<p style="font-size: 16px;">test it!!</p>
+        //         <br />
+        //     ` // email content in HTML
+        // };
+
+        // returning result
+        return transporter.sendMail(mailPayload, (erro, info) => {
+            if(erro){
+                return res.send(erro.toString());
+            }
+            return res.send('Sended');
+        });
+    });    
+});
 
 
 
