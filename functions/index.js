@@ -1,128 +1,48 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-// import * as Notifications from 'expo-notifications';
-// const {onValueCreated} = require("firebase-functions/v2/database");
 const logger = require("firebase-functions/logger");
-const {getMessaging} = require("firebase-admin/messaging");
-// const {initializeApp} = require("firebase-admin/app");
-// The Firebase Admin SDK to access the Firebase Realtime Database.
 const admin = require("firebase-admin");
 admin.initializeApp();
-// initializeApp();
 const {Expo} = require('expo-server-sdk');
 const expo = new Expo();
 
 const {setGlobalOptions} = require("firebase-functions/v2");
 setGlobalOptions({maxInstances: 10});
 
-const {onValueCreated} = require("firebase-functions/v2/database");
-// const logger = require("firebase-functions/logger");
-// const {https} = require('firebase-functions/v1');
-const https = require('https');
+const {onValueCreated, onValueUpdated} = require("firebase-functions/v2/database");
+const {onRequest} = require("firebase-functions/v2/https");
 
-exports.onNewFormation = onValueCreated({
-    ref: "/formations/{formationId}",
-    instance: "appdolivier-default-rtdb",
-    region: "europe-west1"
-  }, async (event) => {
-    const formationData = event.data.val();
-    const formationId = event.params.formationId;
-  
-    if (!formationData) {
-      logger.warn("No data associated with the event");
-      return;
-    }
-  
-    const payload = {
-      title: `Nouvelle Formation le ${formationData.date}`,
-      body: `"${formationData.title}"`
-      
-    };
-    //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
-    //https://sendnotification-akam5j3lyq-uc.a.run.app
+// Helper function to send notification
+const sendNotification = async (expoPushToken, data, id, uid) => {
+  const chunks = expo.chunkPushNotifications([{ to: expoPushToken, ...data }]);
+  const tickets = [];
+
+  for (const chunk of chunks) {
     try {
-      const response = await fetch('https://sendbulknotifications-akam5j3lyq-uc.a.run.app/', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        headers: {'Content-Type': 'application/json'},
-        data: formationId //for the admin's validation panel
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const responseData = await response.text();
-      logger.info('Notification request sent successfully:', responseData);
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...ticketChunk);
     } catch (error) {
-      logger.error('Error calling notification function:', error);
+      console.error(error);
     }
-  });
-
-
-
-exports.onNewInscription = onValueCreated({
-  ref: "/demandes/{userUid}/{formationUid}",
-  instance: "appdolivier-default-rtdb",
-  region: "europe-west1"
-}, async (event) => {
-  const userData = event.data.val();
-  const userUid = event.params.userUid;
-  const formationUid = event.params.formationUid;
-  const adminEmail = "thomas.carstens@outlook.com" //docteurdumay@gmail.com in production
-  console.log(userData)
-  if (!userData) {
-    logger.warn("No data associated with the event");
-    return;
   }
 
-  const payload = {
-    title: 'Nouvelle demande d\'inscription',
-    body: `${userData.prenom} ${userData.nom} `,
-    data: formationUid //for the admin's validation panel
-    
-  };
-  //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
-  //https://sendnotification-akam5j3lyq-uc.a.run.app
-  try {
-    const response = await fetch('https://sendbulknotifications-akam5j3lyq-uc.a.run.app/', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: {'Content-Type': 'application/json'}
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  let response = "";
+  for (const ticket of tickets) {
+    if (ticket.status === "error") {
+      if (ticket.details && ticket.details.error === "DeviceNotRegistered") {
+        response = "DeviceNotRegistered";
+      }
     }
-
-    const responseData = await response.text();
-    logger.info('Notification request sent successfully:', responseData);
-  } catch (error) {
-    logger.error('Error calling notification function:', error);
+    if (ticket.status === "ok") {
+      response = ticket.id;
+    }
   }
 
-  // Prepare email payload
-  const emailPayload = {
-    from: 'Administrateur Dumay sur Esculappl <admin-dumay@gmail.com>', 
-    to: userData.email, // to change to user
-    subject: "Demande d'inscription sur Esculapp",
-    html: `<p style="font-size: 16px;">L'inscription est en attente. Munissez vous de votre code d'acces pour repondre a la demande d'inscription.<br/>
-      Utilisateur: ${userData.prenom} ${userData.nom} <br/>
-      Formation: ${userData.formationTitle} <br/>      
-      </p>
-      <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
-    <br />`, // email content in HTML
-    body: `test body `
-  };
+  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response);
+  return response;
+};
 
+// Helper function to send email
+const sendEmail = async (emailPayload) => {
   try {
-    // Send email notification
     const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
       method: 'POST',
       body: JSON.stringify(emailPayload),
@@ -137,13 +57,145 @@ exports.onNewInscription = onValueCreated({
   } catch (error) {
     logger.error('Error calling email function:', error);
   }
+};
+
+exports.onInscriptionValidation = onValueUpdated({
+  ref: "/demandes/{userUid}/{formationUid}/admin",
+  instance: "appdolivier-default-rtdb",
+  region: "europe-west1"
+}, async (event) => {
+  const adminStatus = event.data.val();
+  const userUid = event.params.userUid;
+  const formationUid = event.params.formationUid;
+
+  if (!adminStatus) {
+    logger.warn("No data associated with the event");
+    return;
+  }
+
+  // Fetch user data
+  const userSnapshot = await admin.database().ref(`userdata/${userUid}`).once('value');
+  const userData = userSnapshot.val();
+
+  // Fetch formation data
+  const formationSnapshot = await admin.database().ref(`formations/${formationUid}`).once('value');
+  const formationData = formationSnapshot.val();
+
+  let title, body, emailSubject, emailContent;
+  if (adminStatus === "validé") {
+    title = "Inscription acceptée";
+    body = `Votre inscription à "${formationData.title}" a été acceptée.`;
+    emailSubject = "Confirmation d'inscription sur Esculappl";
+    emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été acceptée.</p>`;
+  } else if (adminStatus === "rejeté") {
+    title = "Inscription rejetée";
+    body = `Votre inscription à "${formationData.title}" a été rejetée. Veuillez contacter admin-dumay@gmail.com.`;
+    emailSubject = "Rejet d'inscription sur Esculappl";
+    emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été rejetée. Veuillez contacter admin-dumay@gmail.com pour plus d'informations.</p>`;
+  } else {
+    logger.warn("Invalid admin status");
+    return;
+  }
+
+  const timestamp = Date.now();
+  await admin.database().ref(`notification-panel/${timestamp}`).set({
+    title,
+    body,
+    timestamp,
+    formationId: formationUid
+  });
+
+  const token = userData?.notifications?.token;
+  if (token && Expo.isExpoPushToken(token)) {
+    const message = {
+      to: token,
+      sound: 'default',
+      title: title,
+      body: body,
+    };
+
+    await sendNotification(token, message, timestamp, userUid);
+  }
+
+  const emailPayload = {
+    from: 'Administrateur Dumay <admin-dumay@gmail.com>',
+    to: userData.email,
+    subject: emailSubject,
+    html: `${emailContent}
+      <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+    <br />`,
+  };
+
+  await sendEmail(emailPayload);
 });
-const {onRequest} = require("firebase-functions/v2/https");
+
+exports.onFormationValidation = onValueUpdated({
+  ref: "/formations/{formationId}/admin",
+  instance: "appdolivier-default-rtdb",
+  region: "europe-west1"
+}, async (event) => {
+  const adminStatus = event.data.val();
+  const formationId = event.params.formationId;
+
+  if (adminStatus !== "validé") {
+    logger.warn("Formation not validated");
+    return;
+  }
+
+  const formationSnapshot = await admin.database().ref(`formations/${formationId}`).once('value');
+  const formationData = formationSnapshot.val();
+
+  const title = "Nouvelle formation";
+  const body = `"${formationData.title}" le ${formationData.date}`;
+
+  const timestamp = Date.now();
+  await admin.database().ref(`notification-panel/${timestamp}`).set({
+    title,
+    body,
+    timestamp,
+    formationId
+  });
+
+  // Fetch all users
+  const usersSnapshot = await admin.database().ref('userdata').once('value');
+  const users = usersSnapshot.val();
+
+  for (const [uid, userData] of Object.entries(users)) {
+    const token = userData?.notifications?.token;
+
+    if (token && Expo.isExpoPushToken(token)) {
+      const message = {
+        to: token,
+        sound: 'default',
+        title: title,
+        body: body,
+      };
+
+      await sendNotification(token, message, timestamp, uid);
+    }
+  }
+
+  // Send email to admin
+  const emailPayload = {
+    from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
+    to: 'admin-dumay@gmail.com', // Change this to the actual admin email
+    subject: "Nouvelle formation validée sur Esculappl",
+    html: `<p style="font-size: 16px;">
+      Une nouvelle formation a été validée :<br/>
+      Formation: ${formationData.title} <br/>
+      Date: ${formationData.date} <br/>
+      </p>
+      <p style="font-size: 16px;">Date de validation: ${new Date().toLocaleString()}</p>
+    <br />`,
+  };
+
+  await sendEmail(emailPayload);
+});
 
 
-exports.sendNotification = onRequest(async (req, res) => {
+exports.sendAdminNotification = onRequest(async (req, res) => {
   const {title, body} = req.body;
-  let token = "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]"
+  let token = "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]" //admin when ready
   if (!title || !body || !token) {
     logger.warn("Missing title, body, or token in the request");
     res.status(400).send("Please provide title, body, and token for the notification");
@@ -153,6 +205,13 @@ exports.sendNotification = onRequest(async (req, res) => {
   try {
     let response;
     
+    const timestamp = Date.now();
+    admin.database().ref(`admin-panel/${timestamp}`).set({
+      title,
+      body,
+      timestamp,
+    });
+
     if (Expo.isExpoPushToken(token)) {
       // Send notification using Expo
       const message = {
@@ -163,6 +222,8 @@ exports.sendNotification = onRequest(async (req, res) => {
       };
       response = await expo.sendPushNotificationsAsync([message]);
       logger.info('Expo notification sent successfully:', response);
+
+      
     } else {
       // Assume it's an FCM token and send using Firebase
       const message = {
@@ -182,49 +243,154 @@ exports.sendNotification = onRequest(async (req, res) => {
   }
 });
 
-// TO BE TESTED: SCHEDULER
-// async function scheduleAndCancel(message) {
-//   const identifier = await Notifications.scheduleNotificationAsync({
-//     content: {
-//       title: message.title,
-//       body: message.body,
-//     },
-//     trigger: { hour: 9, minute: 20 },
-//   });
-//   await Notifications.cancelScheduledNotificationAsync(identifier);
-// }
 
-const sendNotification = async (expoPushToken, data, id, uid) => {
-  const expo = new Expo({ accessToken: process.env.ACCESS_TOKEN });
-  const chunks = expo.chunkPushNotifications([{ to: expoPushToken, ...data }]);
-  const tickets = [];
 
-  for (const chunk of chunks) {
-    try {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
-    } catch (error) {
-      console.error(error);
-    }
+exports.onNewFormation = onValueCreated({
+  ref: "/formations/{formationId}",
+  instance: "appdolivier-default-rtdb",
+  region: "europe-west1"
+}, async (event) => {
+  const formationData = event.data.val();
+  const formationId = event.params.formationId;
+
+  if (!formationData) {
+    logger.warn("No data associated with the event");
+    return;
   }
 
-  let response = "";
-  for (const ticket of tickets) {
-    if (ticket.status === "error") {
-      if (ticket.details && ticket.details.error === "DeviceNotRegistered") {
-        response = "DeviceNotRegistered";
-        // should delete this when live
-      }
+  const payload = {
+    title: `[Admin] Nouvelle Formation le ${formationData.date}`,
+    body: `"${formationData.title}"`
+    
+  };
+  //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
+  //https://sendnotification-akam5j3lyq-uc.a.run.app
+  //https://sendadminnotification-akam5j3lyq-uc.a.run.app
+  try {
+    const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {'Content-Type': 'application/json'},
+      data: formationId //for the admin's validation panel
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    if (ticket.status === "ok") {
-      response = ticket.id;
-    }
+
+    const responseData = await response.text();
+    logger.info('Notification request sent successfully:', responseData);
+  } catch (error) {
+    logger.error('Error calling notification function:', error);
   }
 
-  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response);
-  return response;
+// Prepare email payload
+const emailPayload = {
+  from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
+  to: 'admin-dumay@gmail.com', // Change this to the actual admin email
+  subject: "Demande d'ajout formation sur Esculappl",
+  html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
+    Formation: ${formationData.title} <br/>      
+    Plus d'informations dans l'espace de Validation d'Inscriptions sur Esculappl.
+    </p>
+    <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+  <br />`, // email content in HTML
+  body: `test body `
 };
 
+try {
+  // Send email notification
+  const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+    method: 'POST',
+    body: JSON.stringify(emailPayload),
+    headers: {'Content-Type': 'application/json'}
+  });
+
+  if (!emailResponse.ok) {
+    throw new Error(`HTTP error! status: ${emailResponse.status}`);
+  }
+
+  logger.info('Email request sent successfully:', await emailResponse.text());
+} catch (error) {
+  logger.error('Error calling email function:', error);
+}
+
+});
+
+
+
+exports.onNewInscription = onValueCreated({
+ref: "/demandes/{userUid}/{formationUid}",
+instance: "appdolivier-default-rtdb",
+region: "europe-west1"
+}, async (event) => {
+const userData = event.data.val();
+const userUid = event.params.userUid;
+const formationUid = event.params.formationUid;
+const adminEmail = "thomas.carstens@outlook.com" //docteurdumay@gmail.com in production
+console.log(userData)
+if (!userData) {
+  logger.warn("No data associated with the event");
+  return;
+}
+
+const payload = {
+  title: '[Admin] Nouvelle demande d\'inscription',
+  body: `${userData.prenom} ${userData.nom} `,
+  data: formationUid //for the admin's validation panel
+  
+};
+//https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
+//https://sendnotification-akam5j3lyq-uc.a.run.app
+try {
+  const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {'Content-Type': 'application/json'}
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const responseData = await response.text();
+  logger.info('Notification request sent successfully:', responseData);
+} catch (error) {
+  logger.error('Error calling notification function:', error);
+}
+
+// Prepare email payload
+const emailPayload = {
+  from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
+  to: userData.email, // to change to user
+  subject: "Demande d'inscription sur Esculappl",
+  html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
+    Utilisateur: ${userData.prenom} ${userData.nom} <br/>
+    Formation: ${userData.formationTitle} <br/>      
+    Plus d'informations dans l'espace de Validation d'Inscriptions sur Esculappl.
+    </p>
+    <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+  <br />`, // email content in HTML
+  body: `test body `
+};
+
+try {
+  // Send email notification
+  const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+    method: 'POST',
+    body: JSON.stringify(emailPayload),
+    headers: {'Content-Type': 'application/json'}
+  });
+
+  if (!emailResponse.ok) {
+    throw new Error(`HTTP error! status: ${emailResponse.status}`);
+  }
+
+  logger.info('Email request sent successfully:', await emailResponse.text());
+} catch (error) {
+  logger.error('Error calling email function:', error);
+}
+});
 
 exports.sendBulkNotifications = onRequest(async (req, res) => {
     const {title, body, data} = req.body;
@@ -302,18 +468,6 @@ exports.sendMail = onRequest((req, res) => {
         // const dest = req.query.dest;
         const mailPayload = req.body;
         
-        
-
-
-        // const mailOptions = {
-        //     from: 'Administrateur Dumay sur Esculappl <admin-dumay@gmail.com>', // Something like: Jane Doe <janedoe@gmail.com>
-        //     to: dest,
-        //     subject: 'test', // email subject
-        //     html: `<p style="font-size: 16px;">test it!!</p>
-        //         <br />
-        //     ` // email content in HTML
-        // };
-
         // returning result
         return transporter.sendMail(mailPayload, (erro, info) => {
             if(erro){
@@ -323,6 +477,5 @@ exports.sendMail = onRequest((req, res) => {
         });
     });    
 });
-
 
 
