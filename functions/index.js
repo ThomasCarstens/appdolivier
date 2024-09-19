@@ -40,8 +40,8 @@ exports.onNewFormation = onValueCreated({
     }
   
     const payload = {
-      title: 'New Formation Created',
-      body: `A new formation "${formationData.title}" has been created.`
+      title: `Nouvelle Formation le ${formationData.date}`,
+      body: `"${formationData.title}"`
       
     };
     //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
@@ -50,7 +50,8 @@ exports.onNewFormation = onValueCreated({
       const response = await fetch('https://sendbulknotifications-akam5j3lyq-uc.a.run.app/', {
         method: 'POST',
         body: JSON.stringify(payload),
-        headers: {'Content-Type': 'application/json'}
+        headers: {'Content-Type': 'application/json'},
+        data: formationId //for the admin's validation panel
       });
   
       if (!response.ok) {
@@ -74,7 +75,7 @@ exports.onNewInscription = onValueCreated({
   const userData = event.data.val();
   const userUid = event.params.userUid;
   const formationUid = event.params.formationUid;
-  const adminEmail = "thomas.carstens@outlook.com"
+  const adminEmail = "thomas.carstens@outlook.com" //docteurdumay@gmail.com in production
   console.log(userData)
   if (!userData) {
     logger.warn("No data associated with the event");
@@ -83,7 +84,8 @@ exports.onNewInscription = onValueCreated({
 
   const payload = {
     title: 'Nouvelle demande d\'inscription',
-    body: `A new inscription to ${formationUid} has been requested.`
+    body: `${userData.prenom} ${userData.nom} `,
+    data: formationUid //for the admin's validation panel
     
   };
   //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
@@ -109,10 +111,10 @@ exports.onNewInscription = onValueCreated({
   const emailPayload = {
     from: 'Administrateur Dumay sur Esculappl <admin-dumay@gmail.com>', 
     to: userData.email, // to change to user
-    subject: "New Inscription Request",
-    html: `<p style="font-size: 16px;">New Inscription Request:\n
-      User: ${userUid}
-      Formation: ${formationUid}
+    subject: "Demande d'inscription sur Esculapp",
+    html: `<p style="font-size: 16px;">L'inscription est en attente. Munissez vous de votre code d'acces pour repondre a la demande d'inscription.<br/>
+      Utilisateur: ${userData.prenom} ${userData.nom} <br/>
+      Formation: ${userData.formationTitle} <br/>      
       </p>
       <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
     <br />`, // email content in HTML
@@ -225,8 +227,8 @@ const sendNotification = async (expoPushToken, data, id, uid) => {
 
 
 exports.sendBulkNotifications = onRequest(async (req, res) => {
-    const {title, body} = req.body;
-  
+    const {title, body, data} = req.body;
+    const id = data
     if (!title || !body) {
       console.warn("Missing title or body in the request");
       res.status(400).send("Please provide both title and body for the notifications");
@@ -243,7 +245,8 @@ exports.sendBulkNotifications = onRequest(async (req, res) => {
       admin.database().ref(`notification-panel/${timestamp}`).set({
         title,
         body,
-        timestamp
+        timestamp,
+        id
       });
 
     
