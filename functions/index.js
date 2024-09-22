@@ -137,7 +137,7 @@ exports.onFormationValidation = onValueUpdated({
   const adminStatus = event.data.val();
   const formationId = event.params.formationId;
 
-  if (adminStatus !== "validé") {
+  if (adminStatus !== "Validée") {
     logger.warn("Formation not validated");
     return;
   }
@@ -371,7 +371,7 @@ const emailPayload = {
     </p>
     <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
   <br />`, // email content in HTML
-  body: `test body `
+  // body: `test body `
 };
 
 try {
