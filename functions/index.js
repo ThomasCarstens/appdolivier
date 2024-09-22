@@ -64,7 +64,9 @@ exports.onInscriptionValidation = onValueUpdated({
   instance: "appdolivier-default-rtdb",
   region: "europe-west1"
 }, async (event) => {
-  const adminStatus = event.data.val();
+  // console.log(event.data)
+  const adminStatus = event.data.after._data;
+  
   const userUid = event.params.userUid;
   const formationUid = event.params.formationUid;
 
@@ -82,12 +84,12 @@ exports.onInscriptionValidation = onValueUpdated({
   const formationData = formationSnapshot.val();
 
   let title, body, emailSubject, emailContent;
-  if (adminStatus === "validé") {
+  if (adminStatus === "Validée") {
     title = `Inscription acceptée : ${formationData.title}`;
     body = `Votre inscription à "${formationData.title}" a été acceptée.`;
     emailSubject = title;
     emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été acceptée.</p>`;
-  } else if (adminStatus === "rejeté") {
+  } else if (adminStatus === "Rejetée") {
     title = `Inscription rejetée : ${formationData.title}`;
     body = `Votre inscription à "${formationData.title}" a été rejetée. Veuillez contacter contact.esculappl@gmail.com.`;
     emailSubject = title;
@@ -115,6 +117,8 @@ exports.onInscriptionValidation = onValueUpdated({
     };
 
     await sendNotification(token, message, timestamp, userUid);
+  } else {
+    console.log("Token not valid: ", token)
   }
 
   const emailPayload = {
@@ -129,21 +133,19 @@ exports.onInscriptionValidation = onValueUpdated({
   await sendEmail(emailPayload);
 });
 
-exports.onFormationValidation = onValueUpdated({
-  ref: "/formations/{formationId}/admin",
+
+exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on creation.
+  ref: "/formations/{formationId}",
   instance: "appdolivier-default-rtdb",
   region: "europe-west1"
 }, async (event) => {
-  const adminStatus = event.data.val();
+  const formationData = event.data.val();
   const formationId = event.params.formationId;
 
-  if (adminStatus !== "validé") {
-    logger.warn("Formation not validated");
+  if (!formationData) {
+    logger.warn("No data associated with the event");
     return;
   }
-
-  const formationSnapshot = await admin.database().ref(`formations/${formationId}`).once('value');
-  const formationData = formationSnapshot.val();
 
   const title = "Nouvelle formation";
   const body = `"${formationData.title}" le ${formationData.date}`;
@@ -179,7 +181,7 @@ exports.onFormationValidation = onValueUpdated({
   const emailPayload = {
     from: 'Administrateur Esculappl <contact.esculappl@gmail.com>', 
     to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
-    subject: `Formation Validée: ${formationData.title}`,
+    subject: `Formation Visible: ${formationData.title}`,
     html: `<p style="font-size: 16px;">
       Votre formation a été validée :<br/>
       Formation: ${formationData.title} <br/>
@@ -191,6 +193,69 @@ exports.onFormationValidation = onValueUpdated({
 
   await sendEmail(emailPayload);
 });
+
+// exports.onFormationValidation = onValueUpdated({
+//   ref: "/formations/{formationId}/admin",
+//   instance: "appdolivier-default-rtdb",
+//   region: "europe-west1"
+// }, async (event) => {
+//   const adminStatus = event.data.val();
+//   const formationId = event.params.formationId;
+
+//   if (adminStatus !== "validé") {
+//     logger.warn("Formation not validated");
+//     return;
+//   }
+
+//   const formationSnapshot = await admin.database().ref(`formations/${formationId}`).once('value');
+//   const formationData = formationSnapshot.val();
+
+//   const title = "Nouvelle formation";
+//   const body = `"${formationData.title}" le ${formationData.date}`;
+
+//   const timestamp = Date.now();
+//   await admin.database().ref(`notification-panel/${timestamp}`).set({
+//     title,
+//     body,
+//     timestamp,
+//     formationId
+//   });
+
+//   // Fetch all users
+//   const usersSnapshot = await admin.database().ref('userdata').once('value');
+//   const users = usersSnapshot.val();
+
+//   for (const [uid, userData] of Object.entries(users)) {
+//     const token = userData?.notifications?.token;
+
+//     if (token && Expo.isExpoPushToken(token)) {
+//       const message = {
+//         to: token,
+//         sound: 'default',
+//         title: title,
+//         body: body,
+//       };
+
+//       await sendNotification(token, message, timestamp, uid);
+//     }
+//   }
+
+//   // Send email to admin
+//   const emailPayload = {
+//     from: 'Administrateur Esculappl <contact.esculappl@gmail.com>', 
+//     to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
+//     subject: `Formation Validée: ${formationData.title}`,
+//     html: `<p style="font-size: 16px;">
+//       Votre formation a été validée :<br/>
+//       Formation: ${formationData.title} <br/>
+//       Date: ${formationData.date} <br/>
+//       </p>
+//       <p style="font-size: 16px;">Date de validation: ${new Date().toLocaleString()}</p>
+//     <br />`,
+//   };
+
+//   await sendEmail(emailPayload);
+// });
 
 
 exports.sendAdminNotification = onRequest(async (req, res) => {
@@ -245,77 +310,77 @@ exports.sendAdminNotification = onRequest(async (req, res) => {
 
 
 
-exports.onNewFormation = onValueCreated({
-  ref: "/formations/{formationId}",
-  instance: "appdolivier-default-rtdb",
-  region: "europe-west1"
-}, async (event) => {
-  const formationData = event.data.val();
-  const formationId = event.params.formationId;
+// exports.onNewFormation = onValueCreated({
+//   ref: "/formations/{formationId}",
+//   instance: "appdolivier-default-rtdb",
+//   region: "europe-west1"
+// }, async (event) => {
+//   const formationData = event.data.val();
+//   const formationId = event.params.formationId;
 
-  if (!formationData) {
-    logger.warn("No data associated with the event");
-    return;
-  }
+//   if (!formationData) {
+//     logger.warn("No data associated with the event");
+//     return;
+//   }
 
-  const payload = {
-    title: `[Admin] Nouvelle Formation le ${formationData.date}`,
-    body: `"${formationData.title}"`
+//   const payload = {
+//     title: `[Admin] Nouvelle Formation le ${formationData.date}`,
+//     body: `"${formationData.title}"`
     
-  };
-  //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
-  //https://sendnotification-akam5j3lyq-uc.a.run.app
-  //https://sendadminnotification-akam5j3lyq-uc.a.run.app
-  try {
-    const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: {'Content-Type': 'application/json'},
-      data: formationId //for the admin's validation panel
-    });
+//   };
+//   //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
+//   //https://sendnotification-akam5j3lyq-uc.a.run.app
+//   //https://sendadminnotification-akam5j3lyq-uc.a.run.app
+//   try {
+//     const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
+//       method: 'POST',
+//       body: JSON.stringify(payload),
+//       headers: {'Content-Type': 'application/json'},
+//       data: formationId //for the admin's validation panel
+//     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
 
-    const responseData = await response.text();
-    logger.info('Notification request sent successfully:', responseData);
-  } catch (error) {
-    logger.error('Error calling notification function:', error);
-  }
+//     const responseData = await response.text();
+//     logger.info('Notification request sent successfully:', responseData);
+//   } catch (error) {
+//     logger.error('Error calling notification function:', error);
+//   }
 
-// Prepare email payload
-const emailPayload = {
-  from: 'Administrateur Dumay <contact.esculappl@gmail.com>', 
-  to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
-  subject: `Validation nécessaire: Formation ${formationData.title}`,
-  html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
-    Formation: ${formationData.title} <br/>      
-    Plus d'informations dans l'espace de Validation d'Inscriptions sur Esculappl.
-    </p>
-    <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
-  <br />`, // email content in HTML
-  // body: `test body `
-};
+// // Prepare email payload
+// const emailPayload = {
+//   from: 'Administrateur Dumay <contact.esculappl@gmail.com>', 
+//   to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
+//   subject: `Validation nécessaire: Formation ${formationData.title}`,
+//   html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
+//     Formation: ${formationData.title} <br/>      
+//     Plus d'informations dans l'espace de Validation d'Inscriptions sur Esculappl.
+//     </p>
+//     <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+//   <br />`, // email content in HTML
+//   // body: `test body `
+// };
 
-try {
-  // Send email notification
-  const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
-    method: 'POST',
-    body: JSON.stringify(emailPayload),
-    headers: {'Content-Type': 'application/json'}
-  });
+// try {
+//   // Send email notification
+//   const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+//     method: 'POST',
+//     body: JSON.stringify(emailPayload),
+//     headers: {'Content-Type': 'application/json'}
+//   });
 
-  if (!emailResponse.ok) {
-    throw new Error(`HTTP error! status: ${emailResponse.status}`);
-  }
+//   if (!emailResponse.ok) {
+//     throw new Error(`HTTP error! status: ${emailResponse.status}`);
+//   }
 
-  logger.info('Email request sent successfully:', await emailResponse.text());
-} catch (error) {
-  logger.error('Error calling email function:', error);
-}
+//   logger.info('Email request sent successfully:', await emailResponse.text());
+// } catch (error) {
+//   logger.error('Error calling email function:', error);
+// }
 
-});
+// });
 
 
 
