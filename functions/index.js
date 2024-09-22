@@ -83,15 +83,15 @@ exports.onInscriptionValidation = onValueUpdated({
 
   let title, body, emailSubject, emailContent;
   if (adminStatus === "validé") {
-    title = "Inscription acceptée";
+    title = `Inscription acceptée : ${formationData.title}`;
     body = `Votre inscription à "${formationData.title}" a été acceptée.`;
-    emailSubject = "Confirmation d'inscription sur Esculappl";
+    emailSubject = title;
     emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été acceptée.</p>`;
   } else if (adminStatus === "rejeté") {
-    title = "Inscription rejetée";
-    body = `Votre inscription à "${formationData.title}" a été rejetée. Veuillez contacter admin-dumay@gmail.com.`;
-    emailSubject = "Rejet d'inscription sur Esculappl";
-    emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été rejetée. Veuillez contacter admin-dumay@gmail.com pour plus d'informations.</p>`;
+    title = `Inscription rejetée : ${formationData.title}`;
+    body = `Votre inscription à "${formationData.title}" a été rejetée. Veuillez contacter contact.esculappl@gmail.com.`;
+    emailSubject = title;
+    emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été rejetée. Veuillez contacter contact.esculappl@gmail.com pour plus d'informations.</p>`;
   } else {
     logger.warn("Invalid admin status");
     return;
@@ -118,7 +118,7 @@ exports.onInscriptionValidation = onValueUpdated({
   }
 
   const emailPayload = {
-    from: 'Administrateur Dumay <admin-dumay@gmail.com>',
+    from: 'Administrateur Dumay <contact.esculappl@gmail.com>',
     to: userData.email,
     subject: emailSubject,
     html: `${emailContent}
@@ -177,11 +177,11 @@ exports.onFormationValidation = onValueUpdated({
 
   // Send email to admin
   const emailPayload = {
-    from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
-    to: 'admin-dumay@gmail.com', // Change this to the actual admin email
-    subject: "Nouvelle formation validée sur Esculappl",
+    from: 'Administrateur Esculappl <contact.esculappl@gmail.com>', 
+    to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
+    subject: `Formation Validée: ${formationData.title}`,
     html: `<p style="font-size: 16px;">
-      Une nouvelle formation a été validée :<br/>
+      Votre formation a été validée :<br/>
       Formation: ${formationData.title} <br/>
       Date: ${formationData.date} <br/>
       </p>
@@ -286,16 +286,16 @@ exports.onNewFormation = onValueCreated({
 
 // Prepare email payload
 const emailPayload = {
-  from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
-  to: 'admin-dumay@gmail.com', // Change this to the actual admin email
-  subject: "Demande d'ajout formation sur Esculappl",
+  from: 'Administrateur Dumay <contact.esculappl@gmail.com>', 
+  to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
+  subject: `Validation nécessaire: Formation ${formationData.title}`,
   html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
     Formation: ${formationData.title} <br/>      
     Plus d'informations dans l'espace de Validation d'Inscriptions sur Esculappl.
     </p>
     <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
   <br />`, // email content in HTML
-  body: `test body `
+  // body: `test body `
 };
 
 try {
@@ -361,9 +361,9 @@ try {
 
 // Prepare email payload
 const emailPayload = {
-  from: 'Administrateur Dumay <admin-dumay@gmail.com>', 
-  to: userData.email, // to change to user
-  subject: "Demande d'inscription sur Esculappl",
+  from: 'Administrateur Dumay <contact.esculappl@gmail.com>', 
+  to: 'contact.esculappl@gmail.com', 
+  subject: `Validation nécessaire: Inscription ${userData.nom} [${formationUid}]`,
   html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
     Utilisateur: ${userData.prenom} ${userData.nom} <br/>
     Formation: ${userData.formationTitle} <br/>      
@@ -456,8 +456,12 @@ const transporter = nodemailer.createTransport({
           // port: 587,
           // secure: false, // true for port 465, false for other ports
           auth: {
-              user: 'thomaxarstens@gmail.com',
-              pass: 'pzic filh fyyy ymkk'
+              // user: 'thomaxarstens@gmail.com',
+              // pass: 'pzic filh fyyy ymkk',
+              user: 'contact.esculappl@gmail.com',
+              pass: 'zucw dnfo tcml eaaa'
+
+               
           }
         });
                 
