@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Esculappl Support Website</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #F0F0F0;
+      color: #333333;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .header {
+      background-color: #003366;
+      color: #FFFFFF;
+      padding: 2rem;
+    }
+
+    .header-logo {
+      width: 200px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
+
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .form-container {
+      background-color: #FFFFFF;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #CCCCCC;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .form-button {
+      background-color: #003366;
+      color: #FFFFFF;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .form-button:hover {
+      background-color: #005599;
+    }
+
+    .faq-item {
+      background-color: #FFFFFF;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    .faq-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer {
+      background-color: #003366;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    .nav-link {
+      color: #FFFFFF;
+      text-decoration: underline;
+      margin-right: 1rem;
+    }
+
+    .language-button {
+      background-color: #FFFFFF;
+      color: #003366;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="flex justify-between items-center mb-4">
+      <nav>
+        <a href="index-en.html" class="nav-link">Home</a>
+        <a href="privacy-policy-en.html" class="nav-link">Privacy Policy</a>
+      </nav>
+      <button onclick="changeLanguage()" class="language-button">Français</button>
+    </div>
+    <img src="esculappl-logo.png" alt="Esculappl Logo" class="header-logo">
+    <h1 class="text-2xl font-bold">Welcome to the Esculappl Support Website</h1>
+  </header>
+
+  <main class="content">
+    <section>
+      <h2 class="section-title">Contact us for any questions or issues</h2>
+      <div class="form-container">
+        <form>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="name">Name</label>
+            <input class="form-input" id="name" type="text" placeholder="Enter your name">
+          </div>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="email">Email</label>
+            <input class="form-input" id="email" type="email" placeholder="Enter your email">
+          </div>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="message">Message</label>
+            <textarea class="form-input" id="message" rows="3" placeholder="Enter your message"></textarea>
+          </div>
+          <button class="form-button" type="button" onclick="sendMessage()">Send</button>
+        </form>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">User Instructions</h2>
+      <div class="faq-item">
+        <h3 class="faq-title">Sign up for a course</h3>
+        <p>To sign up for a course, log in to your Esculappl account and go to the page of the course you want. Click the "Sign Up" button to begin.</p>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-title">Create a course</h3>
+        <p>If you're an accredited trainer, you can create your own courses on Esculappl. Log in to your account, go to the "My Courses" page, and click "Create a New Course" to get started.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">FAQ</h2>
+      <div class="faq-item">
+        <h3 class="faq-title">What are the prerequisites for signing up for a course?</h3>
+        <p>To sign up for a course, you must have an Esculappl account. Specific prerequisites for each course are listed on the course page.</p>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-title">Can I cancel my course registration?</h3>
+        <p>Yes, you can cancel your course registration up to 7 days before the course starts. Log in to your account and go to the course page to find the cancellation link.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; 2024 Esculappl. All rights reserved.</p>
+  </footer>
+
+  <script>
+    function changeLanguage() {
+      window.location.href = 'index.html';
+    }
+    function sendMessage() {
+      var name = document.getElementById("name").value;
+      var email = document.getElementById("email").value;
+      var message = document.getElementById("message").value;
+
+      // Simulate sending the message to the email address
+      console.log("Sending message to support.esculappl@gmail.com:");
+      console.log("Name: " + name);
+      console.log("Email: " + email);
+      console.log("Message: " + message);
+      alert("Message sent successfully!");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site web de support Esculappl</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #F0F0F0;
+      color: #333333;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .header {
+      background-color: #003366;
+      color: #FFFFFF;
+      padding: 2rem;
+    }
+
+    .header-logo {
+      width: 200px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
+
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .form-container {
+      background-color: #FFFFFF;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #CCCCCC;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    .form-button {
+      background-color: #003366;
+      color: #FFFFFF;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .form-button:hover {
+      background-color: #005599;
+    }
+
+    .faq-item {
+      background-color: #FFFFFF;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    .faq-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer {
+      background-color: #003366;
+      color: #FFFFFF;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    .nav-link {
+      color: #FFFFFF;
+      text-decoration: underline;
+      margin-right: 1rem;
+    }
+
+    .language-button {
+      background-color: #FFFFFF;
+      color: #003366;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+    <header class="header">
+        <div class="flex justify-between items-center mb-4">
+          <nav>
+            <a href="index.html" class="nav-link">Accueil</a>
+            <a href="privacy-policy.html" class="nav-link">Politique de confidentialité</a>
+          </nav>
+          <button onclick="changeLanguage()" class="language-button">English</button>
+        </div>
+        <img src="esculappl-logo.png" alt="Esculappl Logo" class="header-logo">
+        <h1 class="text-2xl font-bold">Bienvenue sur le site web de support Esculappl</h1>
+      </header>
+
+  <div class="content">
+    <section class="section">
+      <h2 class="section-title">Contactez-nous pour toute question ou problème</h2>
+      <div class="form-container">
+        <form>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="name">Nom</label>
+            <input class="form-input" id="name" type="text" placeholder="Entrez votre nom">
+          </div>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="email">Email</label>
+            <input class="form-input" id="email" type="email" placeholder="Entrez votre email">
+          </div>
+          <div class="mb-4">
+            <label class="block font-bold mb-2" for="message">Message</label>
+            <textarea class="form-input" id="message" rows="3" placeholder="Entrez votre message"></textarea>
+          </div>
+          <button class="form-button" type="button" onclick="sendMessage()">Envoyer</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Instructions pour les utilisateurs</h2>
+      <div class="faq-item">
+        <h3 class="faq-title">S'inscrire à un cours</h3>
+        <p>Pour vous inscrire à un cours, connectez-vous à votre compte Esculappl et accédez à la page du cours de votre choix. Cliquez sur le bouton "S'inscrire" pour commencer.</p>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-title">Créer un cours</h3>
+        <p>Si vous êtes un formateur agréé, vous pouvez créer vos propres cours sur Esculappl. Connectez-vous à votre compte, accédez à la page "Mes cours" et cliquez sur "Créer un nouveau cours" pour commencer.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">FAQ</h2>
+      <div class="faq-item">
+        <h3 class="faq-title">Quels sont les prérequis pour s'inscrire à un cours ?</h3>
+        <p>Pour s'inscrire à un cours, vous devez posséder un compte Esculappl. Les prérequis spécifiques à chaque cours sont indiqués sur la page du cours.</p>
+      </div>
+      <div class="faq-item">
+        <h3 class="faq-title">Puis-je annuler mon inscription à un cours ?</h3>
+        <p>Oui, vous pouvez annuler votre inscription à un cours jusqu'à 7 jours avant le début de celui-ci. Connectez-vous à votre compte et accédez à la page du cours pour trouver le lien d'annulation.</p>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2024 Esculappl. Tous droits réservés.</p>
+  </footer>
+
+  <script>
+    function changeLanguage() {
+      window.location.href = 'index-en.html';
+    }
+    async function sendMessage() {
+      var name = document.getElementById("name").value;
+      var email = document.getElementById("email").value;
+      var message = document.getElementById("message").value;
+
+      // Prepare email payload
+      const emailPayload = {
+        from: email, 
+        to: 'contact.esculappl@gmail.com', 
+        subject: `Urgent: ${name} [Site de Support]`,
+        html: `<p style="font-size: 16px;"> Message recu du site de support Esculappl.<br/>
+          Nom: ${name}<br/>
+          Message: ${message}<br/>
+          </p>
+          <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
+        <br />`, // email content in HTML
+        body: `test body `
+      };
+
+      try {
+        // Send email notification
+        const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+          method: 'POST',
+          body: JSON.stringify(emailPayload),
+          headers: {'Content-Type': 'application/json'}
+        });
+
+        if (!emailResponse.ok) {
+          throw new Error(`HTTP error! status: ${emailResponse.status}`);
+        }
+
+        console.log('Email request sent successfully:', await emailResponse.text());
+      } catch (error) {
+        console.log('Error calling email function:', error);
+      }
+      
+
+      // Simulate sending the message to the email address
+      console.log("Sending message to contact.esculappl@gmail.com:");
+      console.log("Name: " + name);
+      console.log("Email: " + email);
+      console.log("Message: " + message);
+      alert("Message sent successfully!");
+    }
+  </script>
+</body>
+</html>

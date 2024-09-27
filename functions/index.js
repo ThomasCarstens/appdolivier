@@ -36,7 +36,6 @@ const sendNotification = async (expoPushToken, data, id, uid) => {
     }
   }
 
-  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response);
   return response;
 };
 
@@ -116,10 +115,14 @@ exports.onInscriptionValidation = onValueUpdated({
       body: body,
     };
 
-    await sendNotification(token, message, timestamp, userUid);
+    
   } else {
     console.log("Token not valid: ", token)
   }
+
+  //IN-APP NOTIFICATION
+  await sendNotification(token, message, timestamp, userUid);
+  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response); // must change this
 
   const emailPayload = {
     from: 'Administrateur Dumay <contact.esculappl@gmail.com>',
@@ -173,8 +176,12 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
         body: body,
       };
 
-      await sendNotification(token, message, timestamp, uid);
+      
     }
+
+    //IN-APP NOTIFICATION
+    await sendNotification(token, message, timestamp, uid);
+
   }
 
   // Send email to admin
