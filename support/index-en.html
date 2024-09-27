@@ -102,6 +102,59 @@
       border-radius: 0.25rem;
       cursor: pointer;
     }
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #003366;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .message-status {
+      margin-top: 1rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .message-success {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .message-error {
+      background-color: #f44336;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -119,23 +172,39 @@
 
   <main class="content">
     <section>
-      <h2 class="section-title">Contact us for any questions or issues</h2>
+      <h2 class="section-title">Contact us for any questions or requests</h2>
       <div class="form-container">
-        <form>
+        <form id="contact-form">
           <div class="mb-4">
             <label class="block font-bold mb-2" for="name">Name</label>
-            <input class="form-input" id="name" type="text" placeholder="Enter your name">
+            <input class="form-input" id="name" type="text" placeholder="Enter your name" required>
           </div>
           <div class="mb-4">
             <label class="block font-bold mb-2" for="email">Email</label>
-            <input class="form-input" id="email" type="email" placeholder="Enter your email">
+            <input class="form-input" id="email" type="email" placeholder="Enter your email" required>
           </div>
           <div class="mb-4">
             <label class="block font-bold mb-2" for="message">Message</label>
-            <textarea class="form-input" id="message" rows="3" placeholder="Enter your message"></textarea>
+            <textarea class="form-input" id="message" rows="3" placeholder="Enter your message" required></textarea>
           </div>
-          <button class="form-button" type="button" onclick="sendMessage()">Send</button>
+          <div class="mb-4">
+            <label class="block font-bold mb-2">Request Type</label>
+            <div class="checkbox-container">
+              <input type="checkbox" id="delete-data" name="request-type" value="delete-data">
+              <label for="delete-data">Delete my personal data</label>
+            </div>
+            <div class="checkbox-container">
+              <input type="checkbox" id="delete-account" name="request-type" value="delete-account">
+              <label for="delete-account">Delete my account</label>
+            </div>
+            <div class="checkbox-container">
+              <input type="checkbox" id="unsubscribe" name="request-type" value="unsubscribe">
+              <label for="unsubscribe">Unsubscribe from emails</label>
+            </div>
+          </div>
+          <button class="form-button" type="submit">Send</button>
         </form>
+        <div id="message-status" class="message-status" style="display: none;"></div>
       </div>
     </section>
 
@@ -167,22 +236,88 @@
   <footer class="footer">
     <p>&copy; 2024 Esculappl. All rights reserved.</p>
   </footer>
+  <div id="loading-screen" class="loading-screen" style="display: none;">
+    <div class="loading-spinner"></div>
+  </div>
 
   <script>
     function changeLanguage() {
       window.location.href = 'index.html';
     }
-    function sendMessage() {
+
+    document.getElementById('contact-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
       var name = document.getElementById("name").value;
       var email = document.getElementById("email").value;
       var message = document.getElementById("message").value;
+      var deleteData = document.getElementById("delete-data").checked;
+      var deleteAccount = document.getElementById("delete-account").checked;
+      var unsubscribe = document.getElementById("unsubscribe").checked;
 
-      // Simulate sending the message to the email address
-      console.log("Sending message to support.esculappl@gmail.com:");
-      console.log("Name: " + name);
-      console.log("Email: " + email);
-      console.log("Message: " + message);
-      alert("Message sent successfully!");
+      // Show loading screen
+      document.getElementById('loading-screen').style.display = 'flex';
+
+      // Prepare email subject and body
+      let subject = `Demande de ${name}`;
+      let htmlBody = `<p style="font-size: 16px;">Message received from Esculappl support website.<br/>
+        Name: ${name}<br/>
+        Email: ${email}<br/>
+        Message: ${message}<br/>`;
+
+      if (deleteData || deleteAccount || unsubscribe) {
+        subject = `Urgent: Compte Esculapp de ${name}`;
+        htmlBody += `<br/><strong>Specific requests:</strong><br/>`;
+        if (deleteData) htmlBody += "- Delete personal data<br/>";
+        if (deleteAccount) htmlBody += "- Delete account<br/>";
+        if (unsubscribe) htmlBody += "- Unsubscribe from emails<br/>";
+      }
+
+      htmlBody += `</p>
+        <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>`;
+
+      // Prepare email payload
+      const emailPayload = {
+        from: email, 
+        to: 'contact.esculappl@gmail.com', 
+        subject: subject,
+        html: htmlBody,
+        body: "This is a plain text version of the message." 
+      };
+
+      try {
+        // Send email notification
+        const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
+          method: 'POST',
+          body: JSON.stringify(emailPayload),
+          headers: {'Content-Type': 'application/json'}
+        });
+
+        // Hide loading screen
+        document.getElementById('loading-screen').style.display = 'none';
+
+        if (!emailResponse.ok) {
+          throw new Error(`HTTP error! status: ${emailResponse.status}`);
+        }
+
+        console.log('Email request sent successfully:', await emailResponse.text());
+        showMessageStatus('Message sent successfully!', true);
+      } catch (error) {
+        console.log('Error calling email function:', error);
+        showMessageStatus('Error sending message. Please try again.', false);
+      }
+    });
+
+    function showMessageStatus(message, isSuccess) {
+      const statusElement = document.getElementById('message-status');
+      statusElement.textContent = message;
+      statusElement.className = 'message-status ' + (isSuccess ? 'message-success' : 'message-error');
+      statusElement.style.display = 'block';
+
+      // Hide the status message after 5 seconds
+      setTimeout(() => {
+        statusElement.style.display = 'none';
+      }, 5000);
     }
   </script>
 </body>
