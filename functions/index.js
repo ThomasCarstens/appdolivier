@@ -222,7 +222,7 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
   } else {
     console.log("Token not valid: ", token)
     // should count the users who are not notified when live but nothing can be done if they don't authorise it.
-    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set(token); 
+    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set("no token"); 
   }
 
     
@@ -342,16 +342,16 @@ exports.sendAdminNotification = onRequest(async (req, res) => {
       };
       response = await expo.sendPushNotificationsAsync([message]);
       logger.info('Expo notification sent successfully:', response);
-
+      await admin.database().ref(`admin-panel/${timestamp}/received/adminUID`).set(token); 
       //reproduce format here
     } 
     
   } catch (error) {
       console.log("Token not valid: ", token)
       // should count the users who are not notified when live but nothing can be done if they don't authorise it.
-      
+      await admin.database().ref(`admin-panel/${timestamp}/received/adminUID`).set("no token"); 
     } 
-    await admin.database().ref(`admin-panel/${timestamp}/received/adminUID`).set(token); 
+    
 
     const emailPayload = {
       from: from,
@@ -524,7 +524,7 @@ exports.sendBulkNotifications = onRequest(async (req, res) => {
         } else {
           console.log("Token not valid: ", token)
           // should count the users who are not notified when live but nothing can be done if they don't authorise it.
-          await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(token); 
+          await admin.database().ref(`notification-panel/${id}/received/${uid}`).set("no token"); 
         }
       }
     
