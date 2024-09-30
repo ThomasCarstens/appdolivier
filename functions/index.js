@@ -35,7 +35,7 @@ const sendNotification = async (expoPushToken, data, id, uid) => {
       response = ticket.id;
     }
   }
-
+  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response); 
   return response;
 };
 
@@ -57,6 +57,27 @@ const sendEmail = async (emailPayload) => {
     logger.error('Error calling email function:', error);
   }
 };
+
+const sendAdminNotification = async (payload) => {
+  try {
+    const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {'Content-Type': 'application/json'}
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error on sendAdminNotification. Status: ${response.status}`);
+    }
+
+    const responseData = await response.text();
+    logger.info('sendAdminNotification request sent successfully:', responseData);
+  } catch (error) {
+    logger.error('Error calling sendAdminNotification function:', error);
+  }
+}
+
+
 
 exports.onInscriptionValidation = onValueUpdated({
   ref: "/demandes/{userUid}/{formationUid}/admin",
@@ -93,17 +114,35 @@ exports.onInscriptionValidation = onValueUpdated({
     body = `Votre inscription à "${formationData.title}" a été rejetée. Veuillez contacter contact.esculappl@gmail.com.`;
     emailSubject = title;
     emailContent = `<p style="font-size: 16px;">Votre inscription à la formation "${formationData.title}" a été rejetée. Veuillez contacter contact.esculappl@gmail.com pour plus d'informations.</p>`;
+  } else if (adminStatus === "désinscrit") {
+    title = `Désinscription de la formation: ${formationData.title}`;
+    body = `Désinscription d'un membre de "${formationData.title}" .`;
+    emailSubject = title;
+    emailContent = `<p style="font-size: 16px;">Désinscription d'un membre de "${formationData.title}".</p>`;
+    const payload = {
+      title : `Désinscription d'un membre`,
+      body : `Désinscription d'un membre de "${formationData.title}" .`,
+      from : `Admin Esculappl <contact.esculappl@gmail.com>`,
+      to : `contact.esculappl@gmail.com`,
+      subject : title,
+      html :`Aucune info dans ce mail.`
+    }
+    // const {title, body, from, to, subject, html} = req.body;
+    sendAdminNotification(payload)
+    
+    return; // remove to confirm to user
   } else {
-    logger.warn("Invalid admin status");
+    logger.warn("Invalid admin status: ", adminStatus);
     return;
   }
 
   const timestamp = Date.now();
+
   await admin.database().ref(`notification-panel/${timestamp}`).set({
     title,
     body,
     timestamp,
-    formationId: formationUid
+    data: formationUid
   });
 
   const token = userData?.notifications?.token;
@@ -114,18 +153,20 @@ exports.onInscriptionValidation = onValueUpdated({
       title: title,
       body: body,
     };
-
+    //IN-APP NOTIFICATION
+    await sendNotification(token, message, timestamp, userUid);
     
   } else {
     console.log("Token not valid: ", token)
+    // should count the users who are not notified when live but nothing can be done if they don't authorise it.
+    await admin.database().ref(`notification-panel/${timestamp}/received/${userUid}`).set(token); 
   }
 
-  //IN-APP NOTIFICATION
-  await sendNotification(token, message, timestamp, userUid);
-  await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(response); // must change this
+  
+  
 
   const emailPayload = {
-    from: 'Administrateur Dumay <contact.esculappl@gmail.com>',
+    from: 'Esculappl Admin <contact.esculappl@gmail.com>',
     to: userData.email,
     subject: emailSubject,
     html: `${emailContent}
@@ -143,7 +184,7 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
   region: "europe-west1"
 }, async (event) => {
   const formationData = event.data.val();
-  const formationId = event.params.formationId;
+  const data = event.params.formationId;
 
   if (!formationData) {
     logger.warn("No data associated with the event");
@@ -158,7 +199,7 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
     title,
     body,
     timestamp,
-    formationId
+    data
   });
 
   // Fetch all users
@@ -176,17 +217,21 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
         body: body,
       };
 
-      
-    }
-
     //IN-APP NOTIFICATION
-    await sendNotification(token, message, timestamp, uid);
+    await sendNotification(token, message, timestamp, uid);      
+  } else {
+    console.log("Token not valid: ", token)
+    // should count the users who are not notified when live but nothing can be done if they don't authorise it.
+    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set(token); 
+  }
+
+    
 
   }
 
   // Send email to admin
   const emailPayload = {
-    from: 'Administrateur Esculappl <contact.esculappl@gmail.com>', 
+    from: 'Esculappl Admin <contact.esculappl@gmail.com>', 
     to: 'contact.esculappl@gmail.com', // Change this to the actual admin email
     subject: `Formation Visible: ${formationData.title}`,
     html: `<p style="font-size: 16px;">
@@ -261,28 +306,31 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
 //     <br />`,
 //   };
 
-//   await sendEmail(emailPayload);
+//   await sendEmai l(emailPayload);
 // });
 
 
 exports.sendAdminNotification = onRequest(async (req, res) => {
-  const {title, body} = req.body;
-  let token = "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]" //admin when ready
+  //https://sendadminnotification-akam5j3lyq-uc.a.run.app
+  const {title, body, from, to, subject, html} = req.body;
+  
+  const token = "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]" //admin when ready
   if (!title || !body || !token) {
     logger.warn("Missing title, body, or token in the request");
     res.status(400).send("Please provide title, body, and token for the notification");
     return;
   }
-
+  const timestamp = Date.now();
+  admin.database().ref(`admin-panel/${timestamp}`).set({
+    title,
+    body,
+    timestamp,
+  });
+  
   try {
     let response;
     
-    const timestamp = Date.now();
-    admin.database().ref(`admin-panel/${timestamp}`).set({
-      title,
-      body,
-      timestamp,
-    });
+
 
     if (Expo.isExpoPushToken(token)) {
       // Send notification using Expo
@@ -295,25 +343,29 @@ exports.sendAdminNotification = onRequest(async (req, res) => {
       response = await expo.sendPushNotificationsAsync([message]);
       logger.info('Expo notification sent successfully:', response);
 
-      
-    } else {
-      // Assume it's an FCM token and send using Firebase
-      const message = {
-        notification: {
-          title,
-          body
-        },
-        token: token
-      };
-      response = await getMessaging().send(message);
-      logger.info('FCM notification sent successfully:', response);
-    }
-    res.status(200).send("Notification sent successfully");
+      //reproduce format here
+    } 
+    
   } catch (error) {
-    logger.error('Error sending notification:', error);
-    res.status(500).send("Error sending notification");
-  }
+      console.log("Token not valid: ", token)
+      // should count the users who are not notified when live but nothing can be done if they don't authorise it.
+      
+    } 
+    await admin.database().ref(`admin-panel/${timestamp}/received/adminUID`).set(token); 
+
+    const emailPayload = {
+      from: from,
+      to: to,
+      subject: subject,
+      html: html,
+    };
+  
+    await sendEmail(emailPayload);
+
+    
 });
+
+
 
 
 
@@ -407,33 +459,12 @@ if (!userData) {
 }
 
 const payload = {
+  //notification data
   title: '[Admin] Nouvelle demande d\'inscription',
   body: `${userData.prenom} ${userData.nom} `,
-  data: formationUid //for the admin's validation panel
-  
-};
-//https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
-//https://sendnotification-akam5j3lyq-uc.a.run.app
-try {
-  const response = await fetch('https://sendadminnotification-akam5j3lyq-uc.a.run.app/', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    headers: {'Content-Type': 'application/json'}
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  const responseData = await response.text();
-  logger.info('Notification request sent successfully:', responseData);
-} catch (error) {
-  logger.error('Error calling notification function:', error);
-}
-
-// Prepare email payload
-const emailPayload = {
-  from: 'Administrateur Dumay <contact.esculappl@gmail.com>', 
+  data: formationUid, //for the admin's validation panel
+  //email data
+  from: 'Esculappl Admin <contact.esculappl@gmail.com>', 
   to: 'contact.esculappl@gmail.com', 
   subject: `Validation nécessaire: Inscription ${userData.nom} [${formationUid}]`,
   html: `<p style="font-size: 16px;"> Pour y répondre, munissez vous de votre code d'accès Esculappl.<br/>
@@ -443,25 +474,12 @@ const emailPayload = {
     </p>
     <p style="font-size: 16px;">Date: ${new Date().toLocaleString()}</p>
   <br />`, // email content in HTML
-  body: `test body `
+  
 };
 
-try {
-  // Send email notification
-  const emailResponse = await fetch('https://sendmail-akam5j3lyq-uc.a.run.app/', {
-    method: 'POST',
-    body: JSON.stringify(emailPayload),
-    headers: {'Content-Type': 'application/json'}
-  });
-
-  if (!emailResponse.ok) {
-    throw new Error(`HTTP error! status: ${emailResponse.status}`);
-  }
-
-  logger.info('Email request sent successfully:', await emailResponse.text());
-} catch (error) {
-  logger.error('Error calling email function:', error);
-}
+//https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
+//https://sendnotification-akam5j3lyq-uc.a.run.app
+  
 });
 
 exports.sendBulkNotifications = onRequest(async (req, res) => {
@@ -504,8 +522,9 @@ exports.sendBulkNotifications = onRequest(async (req, res) => {
           await sendNotification (token, message, timestamp, uid);
 
         } else {
-          console.log('User without a token', error);
+          console.log("Token not valid: ", token)
           // should count the users who are not notified when live but nothing can be done if they don't authorise it.
+          await admin.database().ref(`notification-panel/${id}/received/${uid}`).set(token); 
         }
       }
     
