@@ -477,6 +477,8 @@ const payload = {
   
 };
 
+sendAdminNotification(payload)
+
 //https://sendbulknotifications-akam5j3lyq-uc.a.run.app/
 //https://sendnotification-akam5j3lyq-uc.a.run.app
   
