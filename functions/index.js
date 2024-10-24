@@ -29,6 +29,8 @@ const sendNotification = async (expoPushToken, data, id, uid) => {
     if (ticket.status === "error") {
       if (ticket.details && ticket.details.error === "DeviceNotRegistered") {
         response = "DeviceNotRegistered";
+      } else {
+        response = ticket.details.error;
       }
     }
     if (ticket.status === "ok") {
@@ -207,6 +209,8 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
   const users = usersSnapshot.val();
 
   for (const [uid, userData] of Object.entries(users)) {
+    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set("not sent yet"); 
+
     const token = userData?.notifications?.token;
 
     if (token && Expo.isExpoPushToken(token)) {
@@ -222,7 +226,7 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
   } else {
     console.log("Token not valid: ", token)
     // should count the users who are not notified when live but nothing can be done if they don't authorise it.
-    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set("no token"); 
+    await admin.database().ref(`notification-panel/${timestamp}/received/${uid}`).set("Invalid or no token"); 
   }
 
     
@@ -245,6 +249,20 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
 
   await sendEmail(emailPayload);
 });
+
+
+// exports.onFormationVisible = onValueUpdated({
+//   ref: "/formations/{formationId}/admin",
+//   instance: "appdolivier-default-rtdb",
+//   region: "europe-west1"
+// }, async (event) => {
+//   // console.log(event.data)
+//   const adminStatus = event.data.after._data;
+
+// });
+
+
+
 
 // exports.onFormationValidation = onValueUpdated({
 //   ref: "/formations/{formationId}/admin",
@@ -314,7 +332,7 @@ exports.sendAdminNotification = onRequest(async (req, res) => {
   //https://sendadminnotification-akam5j3lyq-uc.a.run.app
   const {title, body, from, to, subject, html} = req.body;
   
-  const token = "ExponentPushToken[tW1uTVNX_-AmrJnKuY43k_]" //admin when ready
+  const token = "ExponentPushToken[P2qa9BB8FxSZdJYWp44VuX]" //admin when ready: ExponentPushToken[P2qa9BB8FxSZdJYWp44VuX] (old: ExponentPushToken[Z3U3wuFtQRfAWkCYs7uJHD])
   if (!title || !body || !token) {
     logger.warn("Missing title, body, or token in the request");
     res.status(400).send("Please provide title, body, and token for the notification");
