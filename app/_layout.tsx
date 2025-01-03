@@ -15,16 +15,16 @@ import SignupScreen from './screens/SignupScreen';
 import PasswordResetScreen from './screens/PasswordResetScreen';
 import BackgroundInfoScreen from './screens/BackgroundInfoScreen';
 import InscriptionScreen from './(tabs)/InscriptionScreen';
-import RechercheFormationsScreen from './(tabs)/RechercheFormationsScreen';
+import MissionExpensesScreen from './screens/MissionExpensesScreen';
 import NotifsScreen from './(tabs)/NotifsScreen';
 import ProfilScreen from './(tabs)/ProfilScreen';
-import AjoutFormationScreen from './screens/AjoutFormationScreen';
+import AjoutExpenseScreen from './screens/AjoutExpenseScreen';
 import DemandesFormationsScreen from './(tabs)/DemandesFormationsScreen';
 import DemandesProfilsScreen from './(tabs)/DemandesProfilsScreen';
 import UnderConstructionScreen from './screens/UnderConstructionScreen';
-import FormationScreen from './screens/FormationScreen';
+import ExpenseScreen from './screens/ExpenseScreen';
 import OrganizationsPartenairesScreen from './screens/OrganizationsPartenairesScreen';
-import InscriptionFormationScreen from './screens/InscriptionFormationScreen';
+import InscriptionExpenseScreen from './screens/InscriptionExpenseScreen';
 import ValidationProfilScreen from './screens/ValidationProfilScreen';
 import AjoutFormateurScreen from './screens/AjoutFormateurScreen';
 import RGPDScreen from './screens/RGPDScreen';
@@ -32,6 +32,7 @@ import NotifsScreenSkeleton from './skeleton/NotifsScreenSkeleton';
 import NotificationExplanationScreen from './screens/NotificationExplanationScreen';
 import AccountDeletionScreen from './screens/AccountDeletionScreen';
 import ParticipantsScreen from './screens/ParticipantsScreen';
+// import MissionExpensesScreen from './(tabs)/MissionExpensesScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -82,7 +83,7 @@ function AdminTabs() {
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
 
-        if (route.name === 'RechercheFormations') {
+        if (route.name === 'MissionExpenses') {
           iconName = focused ? 'search' : 'search';
         } else if (route.name === 'Notifications') {
           iconName = focused ? 'notifications' : 'notifications';
@@ -99,7 +100,7 @@ function AdminTabs() {
       tabBarActiveTintColor: 'white',
       tabBarInactiveTintColor: 'black',
     })}>
-      <Tab.Screen name="RechercheFormations" component={RechercheFormationsScreen} initialParams={{spoofLoggedIn: false, spoofFormateur: true, spoofAdmin: true, spoofValidated: true}} />
+      <Tab.Screen name="MissionExpenses" component={MissionExpensesScreen} initialParams={{spoofLoggedIn: false, spoofFormateur: true, spoofAdmin: true, spoofValidated: true}} />
       {/* <Tab.Screen name="NotifsScreenSkeleton" component={NotifsScreenSkeleton} /> */}
       <Tab.Screen name="Administrer" component={DemandesProfilsScreen} />
       <Tab.Screen name="OrganizationsPartenaires" component={OrganizationsPartenairesScreen} />
@@ -150,7 +151,7 @@ function App() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
   
-          if (route.name === 'RechercheFormations') {
+          if (route.name === 'MissionExpenses') {
             iconName = focused ? 'search' : 'search';
           } else if (route.name === 'Notifications') {
             iconName = focused ? 'notifications' : 'notifications';
@@ -163,7 +164,7 @@ function App() {
         tabBarActiveTintColor: 'white',
         tabBarInactiveTintColor: 'black',
       })}>
-        <Tab.Screen name="RechercheFormations" component={RechercheFormationsScreen} initialParams={{spoofLoggedIn: true, spoofFormateur: false, spoofAdmin: false, spoofValidated: true}}/>
+        <Tab.Screen name="MissionExpenses" component={MissionExpensesScreen} initialParams={{spoofLoggedIn: true, spoofFormateur: false, spoofAdmin: false, spoofValidated: true}}/>
         <Tab.Screen name="Notifications" component={NotifsScreen} initialParams={{"gameFileContext": gameFileContext}}/>
         <Tab.Screen name="OrganizationsPartenaires" component={OrganizationsPartenairesScreen} initialParams={{"gameFileContext": gameFileContext}}/>
       </Tab.Navigator>
@@ -179,7 +180,7 @@ function App() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
   
-          if (route.name === 'RechercheFormations') {
+          if (route.name === 'MissionExpenses') {
             iconName = focused ? 'search' : 'search';
           } else if (route.name === 'Notifications') {
             iconName = focused ? 'notifications-outline' : 'notifications-outline';
@@ -192,7 +193,7 @@ function App() {
         tabBarActiveTintColor: 'white',
         tabBarInactiveTintColor: 'black',
       })}>
-        <Tab.Screen name="RechercheFormations" component={RechercheFormationsScreen} initialParams={{spoofLoggedIn: false, spoofFormateur: false, spoofAdmin: false, spoofValidated: true}}/>
+        <Tab.Screen name="MissionExpenses" component={MissionExpensesScreen} initialParams={{spoofLoggedIn: false, spoofFormateur: false, spoofAdmin: false, spoofValidated: true}}/>
         {/* <Tab.Screen name="Notifications" component={NotifsScreen} initialParams={{"gameFileContext": gameFileContext}}/> */}
         {/* <Tab.Screen name="Profil" component={ProfilScreen} initialParams={{"gameFileContext": gameFileContext}}/> */}
       </Tab.Navigator>
@@ -208,7 +209,7 @@ function App() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
   
-          if (route.name === 'RechercheFormations') {
+          if (route.name === 'MissionExpenses') {
             iconName = focused ? 'search' : 'search';
           } else if (route.name === 'Notifications') {
             iconName = focused ? 'notifications-outline' : 'notifications-outline';
@@ -221,7 +222,7 @@ function App() {
         tabBarActiveTintColor: 'white',
         tabBarInactiveTintColor: 'black',
       })}>
-        <Tab.Screen name="RechercheFormations" component={RechercheFormationsScreen} initialParams={{spoofLoggedIn: true, spoofFormateur: true, spoofAdmin: false, spoofValidated: true}}/>
+        <Tab.Screen name="MissionExpenses" component={MissionExpensesScreen} initialParams={{spoofLoggedIn: true, spoofFormateur: true, spoofAdmin: false, spoofValidated: true}}/>
         <Tab.Screen name="Notifications" component={NotifsScreen} initialParams={{"gameFileContext": gameFileContext}}/>
         <Tab.Screen name="Profil" component={ProfilScreen} initialParams={{"gameFileContext": gameFileContext}}/>
       </Tab.Navigator>
@@ -242,7 +243,7 @@ function App() {
   return (
     <NavigationContainer independent={true}>
       <Stack.Navigator>
-
+        <Stack.Screen name="MissionExpenses"  component={MissionExpensesScreen}/>
         <Stack.Screen name="Login"          component={LoginScreen} options={{headerShown: false}} initialParams={{"gameFileContext": gameFileContext}}  />
         <Stack.Screen name="Signup"         component={SignupScreen} />
         <Stack.Screen name="PasswordReset"  component={PasswordResetScreen} />
@@ -252,14 +253,15 @@ function App() {
         
         <Stack.Screen name="NotificationExplanation" component={NotificationExplanationScreen} />
         <Stack.Screen name="AccountDeletion" component={AccountDeletionScreen} />
+        {/* <Stack.Screen name="MissionExpenses" component={MissionExpensesScreen} /> */}
 
         
         <Stack.Screen name="Participants"       component={ParticipantsScreen} />
         
-        <Stack.Screen name="AjoutFormation"       component={AjoutFormationScreen} />
-        <Stack.Screen name="Formation"       component={FormationScreen} />
-        <Stack.Screen name="RechercheFormations"  component={RechercheFormationsScreen} options={{ headerShown: true, headerBackTitleVisible: true }}/>
-        <Stack.Screen name="InscriptionFormation" component={InscriptionFormationScreen} />
+        <Stack.Screen name="AjoutExpense"       component={AjoutExpenseScreen} />
+        <Stack.Screen name="Expense"       component={ExpenseScreen} />
+        
+        <Stack.Screen name="InscriptionExpense" component={InscriptionExpenseScreen} />
 
         {/* tabs if ADMIN */}
         <Stack.Screen name="AdminTabs"            component={AdminTabs} options={{ headerShown: false }}  />

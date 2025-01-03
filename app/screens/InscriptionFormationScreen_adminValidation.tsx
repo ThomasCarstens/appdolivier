@@ -4,7 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import { ref as ref_d, set } from 'firebase/database';
 import { database, auth } from '../../firebase';
 
-const InscriptionFormationScreen = ({ route, navigation }) => {
+const InscriptionExpenseScreen = ({ route, navigation }) => {
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
   const [medecinDiplome, setMedecinDiplome] = useState(false);
@@ -309,6 +309,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default InscriptionFormationScreen;
+export default InscriptionExpenseScreen;
 
 

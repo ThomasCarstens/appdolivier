@@ -13,7 +13,7 @@ import * as FileSystem from 'expo-file-system';
 
 // import { storage } from './db'
 
-const AjoutFormationScreen = ({ navigation, route }) => {
+const AjoutExpenseScreen = ({ navigation, route }) => {
   const [formData, setFormData] = useState({
     id: Date.now().toString(),
     title: '',
@@ -938,4 +938,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AjoutFormationScreen;
+export default AjoutExpenseScreen;
