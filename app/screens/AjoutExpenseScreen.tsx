@@ -1,105 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Text, TextInput, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, View, Text, TextInput, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { ref as ref_d, set, get } from 'firebase/database';
-import { ref as ref_s, uploadBytes, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { auth, firebase, storage, database } from '../../firebase';
 import * as ImagePicker from 'expo-image-picker';
-import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-// import { Media } from '@models/shared/Media'
-// import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 
-// import { storage } from './db'
-
-const AjoutExpenseScreen = ({ navigation, route }) => {
+const AddExpenseScreen = ({ navigation, route }) => {
   const [formData, setFormData] = useState({
     id: Date.now().toString(),
-    title: '',
-    active: true,     //temporary, only admin can make formations in Phase 2, needs to change in Phase 3
+    description: '',
+    amount: '',
     date: new Date(),
-    date_de_fin: new Date(),
-    image: 'https://via.placeholder.com/150',
-    region: '',
-    lieu: '',
-    status: 'propose', //temporary, only admin can make formations in Phase 2, needs to change in Phase 3
-    heureDebut: new Date(),
-    heureFin: new Date(),
-    nature: '',
-    anneeConseillee: '',
-    tarifEtudiant: '',
-    tarifMedecin: '',
-    domaine: '',
-    autresDomaine: '',
-    autreLieu: '',
-    autreRegion: '',
-    autreNature: '',
-    autreAnneeConseillee: '',
-    affiliationDIU: '',
-    autreAffiliationDIU: '',
-    competencesAcquises: '',
-    prerequis: '',
-    instructions: '',
-    admin: 'validée', //temporary, only admin can make formations in Phase 2, needs to change in Phase 3
+    category: '',
+    subcategory: '',
+    paymentMethod: 'Carte Bancaire société',
+    image: null
   });
 
-  // const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [imageUri, setImageUri] = useState(null);
   const [errors, setErrors] = useState({});
-  const [categoryOptions, setCategoryOptions] = useState([]);
-  const [affiliationOptions, setAffiliationOptions] = useState([]);
-  const [lieuOptions, setLieuOptions] = useState([]);
-  const [regionOptions, setRegionOptions] = useState([]);
-  const [anneeOptions, setAnneeOptions] = useState([]);
-  const [natureOptions, setNatureOptions] = useState([]);
 
-  useEffect(() => {
-    downloadFilterOptions();
-    // ... (keep existing useEffect logic)
-  }, [route.params?.formation]);
-
-  const downloadFilterOptions = async () => {
-    try {
-      const parametersRef = ref_d(database, 'parameters');
-      const paramsSnapshot = await get(parametersRef);
-      const parameters = paramsSnapshot.val();
-      console.log(parameters);
-      setCategoryOptions(parameters.categoryOptions);
-      setLieuOptions(parameters.lieuOptions);
-      setRegionOptions(parameters.regionOptions);
-      setAnneeOptions(parameters.anneeOptions);
-      setAffiliationOptions(parameters.affiliationOptions);
-      setNatureOptions(parameters.natureOptions);
-    } catch (error) {
-      console.error('Error checking filter options:', error);
-    }
+  // Categories based on the provided images
+  const categories = {
+    "Virement société": ["Prélèvement société"],
+    "Carte Bancaire société": ["Chèque société"],
+    "Régl. personnel": ["Incertain"],
+    "Fournitures de bureau": [
+      "Fournitures de petit matériel/équipement",
+      "Fournitures administratives/bureau"
+    ],
+    "Entretien matériel": [
+      "Entretien matériel transport",
+      "Entretien matériel de bureau"
+    ],
+    "Frais d'achat et contentieux": [
+      "Assurances et sinistres (général)",
+      "Déplacements professionnels (général, restaurants, parking, hotels...)"
+    ],
+    "Frais postaux": [
+      "Internet",
+      "Mobile",
+      "Téléphone"
+    ],
+    "Sous-traitance montage": ["Maintenance"],
+    "Locations mobilières": ["Primes d'assurance"],
+    "Location diverse société": ["Honoraires comptables"],
+    "Honoraires juridiques": ["Cabinet fisc, etc etc"],
+    "Cotisations": ["Vente de voiture"]
   };
-
-  useEffect(() => {
-    downloadFilterOptions();
-    const existingFormation = route.params?.formation;
-    if (existingFormation) {
-      setFormData({
-        ...existingFormation,
-        date: new Date(existingFormation.date),
-        date_de_fin: new Date(existingFormation.date_de_fin),
-        heureDebut: new Date(`2000-01-01T${existingFormation.heureDebut}`),
-        heureFin: new Date(`2000-01-01T${existingFormation.heureFin}`),
-      });
-    }
-  }, [route.params?.formation]);
 
   const handleInputChange = (name, value) => {
     setFormData(prevState => ({
       ...prevState,
-      [name]: value !== undefined ? value : ''
+      [name]: value
     }));
-    // Clear error for this field if it exists
     if (errors[name]) {
       setErrors(prevErrors => ({
         ...prevErrors,
@@ -108,32 +62,15 @@ const AjoutExpenseScreen = ({ navigation, route }) => {
     }
   };
 
-
-  const handleDateChange = (event, selectedDate, isEndDate = false) => {
-    if (isEndDate) {
-      setShowEndDatePicker(false);
-    } else {
-      setShowDatePicker(false);
-    }
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
     if (selectedDate) {
-      handleInputChange(isEndDate ? 'date_de_fin' : 'date', selectedDate);
-    }
-  };
-
-  const handleTimeChange = (event, selectedTime, type) => {
-    console.log(formData.heureDebut)
-    if (type === 'start') {
-      setShowStartTimePicker(false);
-    } else {
-      setShowEndTimePicker(false);
-    }
-    if (selectedTime) {
-      handleInputChange(type === 'start' ? 'heureDebut' : 'heureFin', selectedTime);
+      handleInputChange('date', selectedDate);
     }
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
@@ -142,255 +79,26 @@ const AjoutExpenseScreen = ({ navigation, route }) => {
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
-      Alert.alert('Uri', result.assets[0].uri)
+      handleInputChange('image', result.assets[0].uri);
     }
   };
 
-
-
-// const uploadImageAsync = async ():  Promise<any> ((resolve,reject) => {
-//     const response =  fetch(imageUri);
-//     const blob =  response.blob();
-
-//     const filename = `formations/${formData.id}_${Date.now()}.jpg`;
-//     const storageRef = ref_s(storage, filename);
-//     // const storageRef = ref_s(storage, location)
-//     const uploadTask = uploadBytesResumable(storageRef, blob)
-
-//     uploadTask.on(
-//       'state_changed',
-//       (snapshot) => {
-//         switch (snapshot.state) {
-//           case 'paused':
-//             break
-//           case 'running':
-//             break
-//         }
-//       },
-//       (error) => {
-//         // A full list of error codes is available at
-//         // https://firebase.google.com/docs/storage/web/handle-errors
-//         switch (error.code) {
-//           case 'storage/unauthorized':
-//             // User doesn't have permission to access the object
-//             break
-//           case 'storage/canceled':
-//             // User canceled the upload
-//             break
-//           case 'storage/unknown':
-//             break
-//         }
-//         reject(error)
-//       },
-//       async () => {
-//         // We're done with the blob, close and release it
-//         try {
-//           //@ts-ignore
-//           blob.close()
-//         } catch (error) {
-//           //blob close seems to throw an error on web, but works on android
-//         }
-
-//         // Upload completed successfully, now we can get the download URL
-//         resolve({ storageUrl: await getDownloadURL(storageRef) })
-//       },
-//     )
-//   })
-
-// export const uploadImageAsync = async (): Promise<void> => {
- 
-//   // return new Promise(async (resolve, reject): Promise<void> => {
-//   //   const filePath = await fetch(media.storageUrl)
-//   //   const blob = await filePath.blob()
-//     const response = await fetch(imageUri);
-//     const blob = await response.blob();
-
-//     const filename = `formations/${formData.id}_${Date.now()}.jpg`;
-//     const storageRef = ref_s(storage, filename);
-//     // const storageRef = ref_s(storage, location)
-//     const uploadTask = uploadBytesResumable(storageRef, blob)
-
-//     uploadTask.on(
-//       'state_changed',
-//       (snapshot) => {
-//         switch (snapshot.state) {
-//           case 'paused':
-//             break
-//           case 'running':
-//             break
-//         }
-//       },
-//       (error) => {
-//         // A full list of error codes is available at
-//         // https://firebase.google.com/docs/storage/web/handle-errors
-//         switch (error.code) {
-//           case 'storage/unauthorized':
-//             // User doesn't have permission to access the object
-//             break
-//           case 'storage/canceled':
-//             // User canceled the upload
-//             break
-//           case 'storage/unknown':
-//             break
-//         }
-//         reject(error)
-//       },
-//       async () => {
-//         // We're done with the blob, close and release it
-//         try {
-//           //@ts-ignore
-//           blob.close()
-//         } catch (error) {
-//           //blob close seems to throw an error on web, but works on android
-//         }
-
-//         // Upload completed successfully, now we can get the download URL
-//         resolve({ storageUrl: await getDownloadURL(storageRef) })
-//       },
-//     )
-//   })
-// }
-
-const uploadImageAsync = async (): Promise<any> => {
- 
-  return new Promise(async (resolve, reject): Promise<void> => {
-    // if (imageUri) {
-      // try {
-        // Request image picker permissions
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Error', 'Permission to access media library is required to upload an image.');
-          return null;
-        }
-        // const snapshot = await upRef.put(blob)
-        // Fetch image data directly
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const filename = `formations/${formData.id}_${Date.now()}.jpg`;
-        const storageRef = ref_s(storage, filename);
-
-        // const filePath = await fetch(media.storageUrl)
-        // const blob = await filePath.blob()
-
-        // const storageRef = ref(storage(), location)
-        const uploadTask = uploadBytesResumable(storageRef, blob)
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        switch (snapshot.state) {
-          case 'paused':
-            break
-          case 'running':
-            break
-        }
-      },
-      (error) => {
-        // A full list of error codes is available at
-        // https://firebase.google.com/docs/storage/web/handle-errors
-        switch (error.code) {
-          case 'storage/unauthorized':
-            // User doesn't have permission to access the object
-            break
-          case 'storage/canceled':
-            // User canceled the upload
-            break
-          case 'storage/unknown':
-            break
-        }
-        reject(error)
-      },
-      async () => {
-        // We're done with the blob, close and release it
-        try {
-          //@ts-ignore
-          blob.close()
-        } catch (error) {
-          //blob close seems to throw an error on web, but works on android
-        }
-
-        // Upload completed successfully, now we can get the download URL
-        resolve( getDownloadURL(storageRef) )
-      },
-    )
-  })
-}
-
-  const uploadImage = async () => {
-    if (imageUri) {
-      try {
-        // Request image picker permissions
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Error', 'Permission to access media library is required to upload an image.');
-          return null;
-        }
-        // const snapshot = await upRef.put(blob)
-        // Fetch image data directly
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const filename = `formations/${formData.id}_${Date.now()}.jpg`;
-        const storageRef = ref_s(storage, filename);
-  
-        // Upload image to Firebase Storage
-        await uploadBytes(storageRef, blob);
-        const downloadURL = await getDownloadURL(storageRef);
-        return downloadURL;
-      } catch (error) {
-        console.error("Error uploading image: ", error);
-        Alert.alert('Error', 'An error occurred while uploading the image.');
-        return null;
-      }
-    }
-    return null;
-  };
   const validateForm = () => {
     let isValid = true;
     let newErrors = {};
 
-    // Check required fields
-    const requiredFields = ['title', 'date', 'heureDebut', 'heureFin', 'lieu', 'region', 'nature', 'anneeConseillee', 'tarifEtudiant', 'tarifMedecin', 'domaine', 'affiliationDIU'];    
-    requiredFields.forEach(field => {
-      if (!formData[field]) {
-        newErrors[field] = 'Ce champ est obligatoire';
-        isValid = false;
-      }
-    });
-
-    // Check if 'autre' fields are filled when their corresponding main fields are 'Autre'
-    if (formData.domaine === 'Autre' && !formData.autresDomaine) {
-      newErrors.autresDomaine = 'Veuillez spécifier le domaine';
-      isValid = false;
-    }
-    if (formData.lieu === 'Autre' && !formData.autreLieu) {
-      newErrors.autreLieu = 'Veuillez spécifier le lieu';
-      isValid = false;
-    }
-    if (formData.region === 'Autre' && !formData.autreRegion) {
-      newErrors.autreRegion = 'Veuillez spécifier la région';
-      isValid = false;
-    }
-    if (formData.nature === 'Autre' && !formData.autreNature) {
-      newErrors.autreNature = 'Veuillez spécifier la nature de la formation';
-      isValid = false;
-    }
-    if (formData.anneeConseillee === 'Autre' && !formData.autreAnneeConseillee) {
-      newErrors.autreAnneeConseillee = 'Veuillez spécifier l\'année conseillée';
-      isValid = false;
-    }
-    if (formData.affiliationDIU === 'Autre' && !formData.autreAffiliationDIU) {
-      newErrors.autreAffiliationDIU = 'Veuillez spécifier l\'Affiliation DIU';
+    if (!formData.description) {
+      newErrors.description = 'Description required';
       isValid = false;
     }
 
-    // Validate numeric fields
-    if (isNaN(Number(formData.tarifEtudiant)) || formData.tarifEtudiant === '') {
-      newErrors.tarifEtudiant = 'Le tarif doit être un nombre';
-      Alert.alert('Uri', imageUri)
+    if (!formData.amount || isNaN(formData.amount)) {
+      newErrors.amount = 'Valid amount required';
       isValid = false;
     }
-    if (isNaN(Number(formData.tarifMedecin)) || formData.tarifMedecin === '') {
-      newErrors.tarifMedecin = 'Le tarif doit être un nombre';
+
+    if (!formData.category) {
+      newErrors.category = 'Category required';
       isValid = false;
     }
 
@@ -400,272 +108,104 @@ const uploadImageAsync = async (): Promise<any> => {
 
   const handleSubmit = () => {
     if (validateForm()) {
-      Alert.alert(
-        "Confirmation",
-        route.params?.formation 
-          ? "Voulez-vous vraiment modifier cette formation ?" 
-          : "Voulez-vous vraiment ajouter cette formation ?",
-        [
-          {
-            text: "Annuler",
-            style: "cancel"
-          },
-          { 
-            text: "OK", 
-            onPress: () => uploadToFirebase() 
-          }
-        ]
-      );
-    } else {
-      Alert.alert("Erreur", "Veuillez remplir correctement tous les champs obligatoires.");
+      // Here you would typically save to your database
+      navigation.goBack();
     }
   };
 
-  const uploadToFirebase = async () => {
-      if (validateForm()) {
-        try {
-          const imageUrl = await uploadImageAsync();
-          const formattedData = {
-            ...formData,
-            date: formData.date.toISOString().split('T')[0],
-            date_de_fin: formData.date_de_fin.toISOString().split('T')[0],
-            heureDebut: formData.heureDebut.toTimeString().split(' ')[0].slice(0, 5),
-            heureFin: formData.heureFin.toTimeString().split(' ')[0].slice(0, 5),
-
-            domaine: formData.domaine === 'Autre' ? formData.autresDomaine : formData.domaine,
-            lieu: formData.lieu === 'Autre' ? formData.autreLieu : formData.lieu,
-            region: formData.region === 'Autre' ? formData.autreRegion : formData.region,
-            nature: formData.nature === 'Autre' ? formData.autreNature : formData.nature,
-            anneeConseillee: formData.anneeConseillee === 'Autre' ? formData.autreAnneeConseillee : formData.anneeConseillee,
-            affiliationDIU: formData.affiliationDIU === 'Autre' ? formData.autreAffiliationDIU : formData.affiliationDIU,
-
-            image: imageUrl || formData.image,
-          };
-  
-          await set(ref_d(database, `formations/${formData.id}`), formattedData);
-          Alert.alert("Succès", route.params?.formation 
-            ? "La formation a été modifiée avec succès."
-            : "La formation a été ajoutée avec succès.");
-          navigation.goBack();
-        } catch (error) {
-          Alert.alert("Erreur", "Une erreur s'est produite lors de l'opération.");
-          console.error(error);
-        }
-      } else {
-        Alert.alert("Erreur", "Veuillez remplir correctement tous les champs obligatoires.");
-      }
-    };
-  
-
-  const renderInput = (label, name, placeholder, keyboardType = 'default', multiline = false) => (
-    <View>
-      <Text style={styles.label}>{label} {requiredFields.includes(name) ? '*' : ''}</Text>
-      <TextInput
-        style={[styles.input, errors[name] && styles.inputError, multiline && styles.multilineInput]}
-        value={formData[name]}
-        onChangeText={(text) => handleInputChange(name, text)}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        multiline={multiline}
-      />
-      {errors[name] && <Text style={styles.errorText}>{errors[name]}</Text>}
-    </View>
-  );
-
-  const requiredFields = ['title', 'date', 'date_de_fin', 'heureDebut', 'heureFin', 'lieu', 'nature', 'anneeConseillee', 'tarifEtudiant', 'tarifMedecin', 'domaine', 'affiliationDIU'];
-
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>
-        {route.params?.formation ? "Modifier la formation" : "Ajouter une nouvelle formation"}
-      </Text>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoText}>ADD EXPENSE</Text>
+          </View>
+          <View style={styles.liveContainer}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE</Text>
+          </View>
+        </View>
+      </View>
 
-      {renderInput('Titre', 'title', 'Titre de la formation')}
-
-      <Text style={styles.label}>Date de début *</Text>
-      <TouchableOpacity style={[styles.input, errors.date && styles.inputError]} onPress={() => setShowDatePicker(true)}>
-        <Text>{formData.date.toLocaleDateString()}</Text>
-      </TouchableOpacity>
-      {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-      {showDatePicker && (
-        <DateTimePicker
-          value={formData.date}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => handleDateChange(event, selectedDate)}
+      <View style={styles.formContainer}>
+        <Text style={styles.label}>Description *</Text>
+        <TextInput
+          style={[styles.input, errors.description && styles.inputError]}
+          value={formData.description}
+          onChangeText={(text) => handleInputChange('description', text)}
+          placeholder="Enter expense description"
         />
-      )}
+        {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
 
-      <Text style={styles.label}>Date de fin *</Text>
-      <TouchableOpacity style={[styles.input, errors.date_de_fin && styles.inputError]} onPress={() => setShowEndDatePicker(true)}>
-        <Text>{formData.date_de_fin.toLocaleDateString()}</Text>
-      </TouchableOpacity>
-      {errors.date_de_fin && <Text style={styles.errorText}>{errors.date_de_fin}</Text>}
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={formData.date_de_fin}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => handleDateChange(event, selectedDate, true)}
+        <Text style={styles.label}>Amount *</Text>
+        <TextInput
+          style={[styles.input, errors.amount && styles.inputError]}
+          value={formData.amount}
+          onChangeText={(text) => handleInputChange('amount', text)}
+          placeholder="Enter amount"
+          keyboardType="numeric"
         />
-      )}
+        {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
 
-      <Text style={styles.label}>Heure de début *</Text>
-      <TouchableOpacity style={[styles.input, errors.heureDebut && styles.inputError]} onPress={() => setShowStartTimePicker(true)}>
-        <Text>{formData.heureDebut.toLocaleTimeString().slice(0, 5)}</Text>
-      </TouchableOpacity>
-      {errors.heureDebut && <Text style={styles.errorText}>{errors.heureDebut}</Text>}
-      {showStartTimePicker && (
-        <DateTimePicker
-          value={formData.heureDebut}
-          mode="time"
-          display="default"
-          onChange={(event, selectedTime) => handleTimeChange(event, selectedTime, 'start')}
-        />
-      )}
-
-      <Text style={styles.label}>Heure de fin *</Text>
-      <TouchableOpacity style={[styles.input, errors.heureFin && styles.inputError]} onPress={() => setShowEndTimePicker(true)}>
-        <Text>{formData.heureFin.toLocaleTimeString().slice(0, 5)}</Text>
-      </TouchableOpacity>
-      {errors.heureFin && <Text style={styles.errorText}>{errors.heureFin}</Text>}
-      {showEndTimePicker && (
-        <DateTimePicker
-          value={formData.heureFin}
-          mode="time"
-          display="default"
-          onChange={(event, selectedTime) => handleTimeChange(event, selectedTime, 'end')}
-        />
-      )}
-
-<Text style={styles.label}>Type de formation *</Text>
-      <Picker
-        selectedValue={formData.nature}
-        style={[styles.picker, errors.nature && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('nature', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez un type de formation" value="" />
-        {natureOptions.map((natureOption, index) => (
-          <Picker.Item key={index} label={natureOption} value={natureOption} />
-        ))}
-
-        
-      </Picker>
-      {errors.nature && <Text style={styles.errorText}>{errors.nature}</Text>}
-
-      {formData.nature === 'Autre' && renderInput('Spécifier le type de formation', 'autreNature', 'Spécifier le type de formation')}
-
-      <Text style={styles.label}>Lieu *</Text>
-      <Picker
-        selectedValue={formData.lieu}
-        style={[styles.picker, errors.lieu && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('lieu', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez un lieu" value="" />
-        {lieuOptions.map((lieuOption, index) => (
-          <Picker.Item key={index} label={lieuOption} value={lieuOption} />
-        ))}
-        {/* <Picker.Item label="Autre" value="Autre" /> */}
-      </Picker>
-      {errors.lieu && <Text style={styles.errorText}>{errors.lieu}</Text>}
-      {formData.lieu === 'Autre' && renderInput('Spécifier le lieu', 'autreLieu', 'Spécifier le lieu')}
-
-
-
-      <Text style={styles.label}>Région *</Text>
-      <Picker
-        selectedValue={formData.region}
-        style={[styles.picker, errors.region && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('region', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez une région" value="" />
-        {regionOptions.map((regionOption, index) => (
-          <Picker.Item key={index} label={regionOption} value={regionOption} />
-        ))}
-        {/* <Picker.Item label="Autre" value="Autre" /> */}
-      </Picker>
-      {errors.region && <Text style={styles.errorText}>{errors.region}</Text>}
-      {formData.region === 'Autre' && renderInput('Spécifier la région', 'autreRegion', 'Spécifier la région')}
-
-
-
-      <Text style={styles.label}>Année d'études conseillée *</Text>
-      <Picker
-        selectedValue={formData.anneeConseillee}
-        style={[styles.picker, errors.anneeConseillee && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('anneeConseillee', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez une année d'études" value="" />
-        {anneeOptions.map((annee, index) => (
-          <Picker.Item key={index} label={annee} value={annee} />
-        ))}
-        {/* <Picker.Item label="Autre" value="Autre" /> */}
-      </Picker>
-      {errors.anneeConseillee && <Text style={styles.errorText}>{errors.anneeConseillee}</Text>}
-      {formData.anneeConseillee === 'Autre' && renderInput('Spécifier l\'année d\'études conseillée', 'autreAnneeConseillee', 'Spécifier l\'année d\'études conseillée')}
-
-
-      
-      {renderInput('Tarif étudiant DIU', 'tarifEtudiant', 'Tarif étudiant DIU', 'numeric')}
-      {renderInput('Tarif médecin', 'tarifMedecin', 'Tarif médecin', 'numeric')}
-
-      <Text style={styles.label}>Domaine *</Text>
-      <Picker
-        selectedValue={formData.domaine}
-        style={[styles.picker, errors.domaine && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('domaine', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez un domaine" value="" />
-        {categoryOptions.map((annee, index) => (
-          <Picker.Item key={index} label={annee} value={annee} />
-        ))}
-        {/* <Picker.Item label="Autre" value="Autre" /> */}
-      </Picker>
-
-      {errors.domaine && <Text style={styles.errorText}>{errors.domaine}</Text>}
-
-      {formData.domaine === 'Autre' && renderInput('Spécifier le domaine', 'domaine', 'Spécifier le domaine')}
-
-      <Text style={styles.label}>Affiliation DIU Université *</Text>
-      <Picker
-        selectedValue={formData.affiliationDIU}
-        style={[styles.picker, errors.affiliationDIU && styles.inputError]}
-        onValueChange={(itemValue) => handleInputChange('affiliationDIU', itemValue)}
-      >
-        <Picker.Item label="Sélectionnez une affiliation" value="" />
-        {affiliationOptions.map((affiliation, index) => (
-          <Picker.Item key={index} label={affiliation} value={affiliation} />
-        ))}
-
-        {/* PACA, Occitanie, Ile de France, Champagnes Ardennes, Loire Atlantique, Bretagne */}
-      </Picker>
-      {errors.affiliationDIU && <Text style={styles.errorText}>{errors.affiliationDIU}</Text>}
-
-      {formData.affiliationDIU === 'Autre' && renderInput('Spécifier l\'affiliation DIU', 'affiliationDIU', 'Spécifier l\'affiliation DIU')}
-      {/* {renderInput('Catégorie', 'category', 'Catégorie de la formation')} */}
-      {renderInput('Compétences acquises', 'competencesAcquises', 'Compétences acquises', 'default', true)}
-      {renderInput('Prérequis', 'prerequis', 'Prérequis', 'default', true)}
-      {renderInput('Instructions', 'instructions', 'Instructions', 'default', true)}
-
-      <Text style={styles.label}>Image de la formation</Text>
-      <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-        ) : (
-          <Text>Sélectionner une image</Text>
+        <Text style={styles.label}>Date *</Text>
+        <TouchableOpacity 
+          style={styles.dateButton} 
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={styles.dateButtonText}>
+            {formData.date.toLocaleDateString()}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={formData.date}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+          />
         )}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <Text style={styles.buttonText}>
-          {route.params?.formationId ? "Modifier la formation" : "Ajouter la formation"}
-        </Text>
-      </TouchableOpacity>
 
-      {Object.keys(errors).length > 0 && (
-        <Text style={styles.errorSummary}>
-          Veuillez corriger les erreurs ci-dessus avant de soumettre le formulaire.
-        </Text>
-      )}
+        <Text style={styles.label}>Category *</Text>
+        <Picker
+          selectedValue={formData.category}
+          style={[styles.picker, errors.category && styles.pickerError]}
+          onValueChange={(value) => handleInputChange('category', value)}
+        >
+          <Picker.Item label="Select a category" value="" />
+          {Object.keys(categories).map((category) => (
+            <Picker.Item key={category} label={category} value={category} />
+          ))}
+        </Picker>
+
+        {formData.category && (
+          <>
+            <Text style={styles.label}>Subcategory</Text>
+            <Picker
+              selectedValue={formData.subcategory}
+              style={styles.picker}
+              onValueChange={(value) => handleInputChange('subcategory', value)}
+            >
+              <Picker.Item label="Select a subcategory" value="" />
+              {categories[formData.category]?.map((subcategory) => (
+                <Picker.Item key={subcategory} label={subcategory} value={subcategory} />
+              ))}
+            </Picker>
+          </>
+        )}
+
+        <Text style={styles.label}>Receipt Image</Text>
+        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+          ) : (
+            <Text style={styles.imagePickerText}>Tap to select receipt image</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Submit Expense</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -673,69 +213,122 @@ const uploadImageAsync = async (): Promise<any> => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#111111',
   },
-  title: {
+  header: {
+    padding: 20,
+    paddingTop: 40,
+    backgroundColor: '#111111',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logoText: {
+    color: '#FFD700',
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+  },
+  liveContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    marginRight: 6,
+  },
+  liveText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  formContainer: {
+    backgroundColor: '#1A1A1A',
+    margin: 20,
+    padding: 20,
+    borderRadius: 8,
   },
   label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 8,
+    fontWeight: '500',
   },
   input: {
+    backgroundColor: '#222222',
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
+    borderColor: '#333333',
+    borderRadius: 8,
+    padding: 12,
+    color: '#FFFFFF',
+    marginBottom: 16,
   },
-  inputError: {
-    borderColor: 'red',
+  dateButton: {
+    backgroundColor: '#222222',
+    borderWidth: 1,
+    borderColor: '#333333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
-  multilineInput: {
-    height: 100,
-    textAlignVertical: 'top',
+  dateButtonText: {
+    color: '#FFFFFF',
   },
   picker: {
+    backgroundColor: '#222222',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: '#1a53ff',
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    borderColor: '#333333',
+    borderRadius: 8,
+    marginBottom: 16,
+    color: '#FFFFFF',
   },
   imagePicker: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#333333',
+    borderRadius: 8,
     height: 200,
-    marginBottom: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: '#222222',
+    overflow: 'hidden',
   },
   imagePreview: {
     width: '100%',
     height: '100%',
     resizeMode: 'contain',
   },
+  imagePickerText: {
+    color: '#666666',
+  },
+  submitButton: {
+    backgroundColor: '#FFD700',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  submitButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 16,
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+  },
+  pickerError: {
+    borderColor: '#FF6B6B',
+  },
 });
 
-export default AjoutExpenseScreen;
+export default AddExpenseScreen;
