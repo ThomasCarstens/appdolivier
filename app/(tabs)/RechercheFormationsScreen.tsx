@@ -605,14 +605,15 @@ const applyFilters = (tab) => {
 const FilterTabs = ({ 
   filters, 
   activeFilters, 
-  activeTab = Object.keys(filters)[0], // Default to first filter type
-  onTabChange = () => {}, // No-op default function
+  activeTab = Object.keys(filters)[0],
+  onTabChange = () => {},
   onFilterChange,
   onApplyFilters 
 }) => {
-  // Remove the state for activeTab and instead keep it as a prop or derive it from the filterTypes
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const filterTypes = Object.keys(filters);
   const currentIndex = filterTypes.indexOf(activeTab);
+  const hasActiveFilters = Object.values(activeFilters).some(value => value !== '');
 
   const navigateTab = (direction) => {
     const newIndex = currentIndex + direction;
@@ -621,6 +622,21 @@ const FilterTabs = ({
     }
   };
 
+  const clearAllFilters = () => {
+    const emptyFilters = {};
+    filterTypes.forEach(filterType => {
+      emptyFilters[filterType] = '';
+      
+    });
+    onFilterChange(emptyFilters);
+    
+    setShowConfirmation(false);
+    
+    //ADD HERE
+    // setActiveFilters('')
+    // applyFilters();
+    // toggleFilters();
+  };
 
   const renderFilterContent = (filterType) => {
     const options = filters[filterType];
@@ -644,6 +660,7 @@ const FilterTabs = ({
                 [filterType]: selectedValue === option ? '' : option
               };
               onFilterChange(newFilters);
+              
             }}
           >
             <Text style={[
@@ -660,6 +677,37 @@ const FilterTabs = ({
 
   return (
     <View style={styles.container}>
+      <View style={styles.filterToggleArea}>
+        {hasActiveFilters && !showConfirmation && (
+          <TouchableOpacity 
+            style={styles.clearFiltersButton}
+            onPress={() => setShowConfirmation(true)}
+          >
+            <Text style={styles.clearFiltersText}>Supprimer les filtres que j'ai choisi</Text>
+            <Ionicons name="close-circle" size={20} color="#FF4444" />
+          </TouchableOpacity>
+        )}
+        {showConfirmation && (
+          <View style={styles.confirmationContainer}>
+            <Text style={styles.confirmationText}>Voulez-vous supprimer tous les filtres ?</Text>
+            <View style={styles.confirmationButtons}>
+              <TouchableOpacity 
+                style={[styles.confirmButton, {backgroundColor: '#FF4444'}]}
+                onPress={clearAllFilters}
+              >
+                <Text style={styles.confirmButtonText}>Oui</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.confirmButton, {backgroundColor: '#666666'}]}
+                onPress={() => setShowConfirmation(false)}
+              >
+                <Text style={styles.confirmButtonText}>Non</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigateTab(-1)}
@@ -703,6 +751,7 @@ const FilterTabs = ({
     </View>
   );
 };
+
   const renderFormationItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.formationItem} 
@@ -804,6 +853,7 @@ const FilterTabs = ({
         onApplyFilters={() => {
           applyFilters(activeTab);
           toggleFilters();
+          
         }}
         activeTab={activeFilterTab}
         onTabChange={setActiveFilterTab}
@@ -1275,6 +1325,84 @@ const styles = StyleSheet.create({
     color: '#1a53ff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 12,
+  },
+
+  applyButton: {
+    backgroundColor: 'black',
+    padding: 12,
+    borderRadius: 20,
+    // flex: 1,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+
+  clearButton: {
+    padding: 8,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterToggleArea: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+
+  clearFiltersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: -8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFEEEE',
+    borderRadius: 8,
+  },
+
+  clearFiltersText: {
+    color: '#FF4444',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  confirmationContainer: {
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  confirmationText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+
+  confirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+
+  confirmButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    minWidth: 60,
+  },
+
+  confirmButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
 
