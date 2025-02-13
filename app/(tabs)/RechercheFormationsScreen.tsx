@@ -329,9 +329,16 @@ const RechercheFormationsScreen = (props, { route }) => {
       const updateParams = snapshot.val()
 
       const latestVersion = Platform.OS === 'ios' ? updateParams.ios.forceUpdate_minimumVersion : updateParams.android.forceUpdate_minimumVersion
-      
-      console.log('v', latestVersion)
-      console.log(compareVersions(currentVersion, latestVersion))
+      // Alert.alert(
+      //   `Latest Version: ${latestVersion}`,
+      //   `Current Version (${currentVersion}). .`,
+      //   [
+      //     // { text: 'Plus tard', style: 'cancel' },
+      //     { text: 'Mettre à jour', onPress: () => openAppStore(updateParams) }
+      //   ]
+      // );
+      // console.log('v', latestVersion)
+      // console.log(compareVersions(currentVersion, latestVersion))
       if (latestVersion && compareVersions(currentVersion, latestVersion) < 0) {
         console.log('UPDATE')
         setIsUpdateAvailable(true);
