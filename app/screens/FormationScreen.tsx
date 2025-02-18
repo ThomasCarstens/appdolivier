@@ -321,8 +321,8 @@ const FormationScreen = ({ route, navigation }) => {
       <Text style={styles.info}>Tarif étudiant: {formation.tarifEtudiant} € / Tarif médecin: {formation.tarifMedecin} €</Text>
       
       <Text style={styles.sectionTitle}>Documentation PDF</Text>
-      {/* <Text style={styles.label}>[ Cette version n'est pas adaptée au format Android ]</Text> */}
-      {formation.pdf ? (
+      <Text style={styles.label}>[ Cette version n'est pas adaptée au format Android ]</Text>
+      {/* {formation.pdf ? (
         <View style={styles.pdfContainer}>
           <RNPdf trustAllCerts={false}
             source={{ uri: formation.pdf, cache: true }}
@@ -342,7 +342,7 @@ const FormationScreen = ({ route, navigation }) => {
         </View>
       ) : (
         <Text style={styles.text}>Aucun document PDF disponible</Text>
-      )}
+      )} */}
 
       <Text style={styles.sectionTitle}>Année conseillée</Text>
       {Array.isArray(formation.anneeConseillee) ? (

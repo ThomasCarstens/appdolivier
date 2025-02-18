@@ -598,7 +598,7 @@ const applyFilters = (tab) => {
       userDemandes[f.id] && userDemandes[f.id].admin === "Validée"
     );
   } else if (tab === 'Passées') {
-    filtered = filtered.filter(f => (new Date(f.date_de_fin) < new Date() && f.active === false));
+    filtered = filtered.filter(f => (new Date(f.date_de_fin) < new Date() && f.active === true));
   } else if (tab === 'Je propose') {
     filtered = filtered.filter(f => (f.status === 'propose'));
   } else if (tab === 'Cachées') {
@@ -758,6 +758,10 @@ const FilterTabs = ({
     );
   }
 
+  const getActiveFilterCount = (filters) => {
+    return Object.values(filters).filter(value => value !== '').length;
+  };
+  
   return (
     <View style={styles.container}> 
       {/* {renderTopButtons()} */}
@@ -779,7 +783,16 @@ const FilterTabs = ({
       </View>
 
       <TouchableOpacity style={styles.filterToggleButton} onPress={toggleFilters}>
-        <Text style={styles.filterToggleButtonText}>Filtres de recherche</Text>
+        <View style={styles.filterToggleContent}>
+          <Text style={styles.filterToggleButtonText}>
+            Filtres de recherche
+            {getActiveFilterCount(activeFilters) > 0 && (
+              <Text style={styles.activeFilterCount}>
+                {` (${getActiveFilterCount(activeFilters)})`}
+              </Text>
+            )}
+          </Text>
+        </View>
         <Ionicons name={showFilters ? "chevron-up" : "chevron-down"} size={24} color="white" />
       </TouchableOpacity>
 
@@ -1282,6 +1295,27 @@ const styles = StyleSheet.create({
     color: '#1a53ff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  filterToggleButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1a53ff',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  filterToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterToggleButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  activeFilterCount: {
+    fontWeight: 'bold',
+    color: '#FFD700', // Golden yellow color for visibility
   },
 });
 
