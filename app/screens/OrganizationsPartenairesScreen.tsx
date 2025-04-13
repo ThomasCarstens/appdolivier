@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Image, Animated, Linking, Alert } from 'react-native';
 import { database, auth } from '../../firebase';
+import { ref as ref_d, set, get, onValue, update } from 'firebase/database';
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const OrganizationsPartenairesScreen = ({navigation}) => {
   const [showFilters, setShowFilters] = useState(false);
   const filterHeight = useState(new Animated.Value(0))[0];
   const [notificationStatus, setNotificationStatus] = useState('Vérification...');
+  const [isAdmin, setIsAdmin] = useState(false);
   const organizations = [
     { id: '1', name: 'SOFMMOOM', image: require('../../assets/images/partenaires/sofMOMMO.png'), description: 'Société Française de Médecine Manuelle Orthopédique et Ostéopathique Médicale', link: 'http://www.sofmmoom.org', type: 'website' },
     { id: '2', name: 'SMMOF', image: require('../../assets/images/partenaires/SMMOF.png'), description: 'Syndicat de Médecine Manuelle Ostéopathie de France', link: 'http://www.smmof.fr', type: 'website' },
@@ -32,7 +36,25 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
     });
 
     checkNotificationStatus();
+    checkIfUserIsAdmin();
   }, [navigation]);
+
+  const checkIfUserIsAdmin = async () => {
+    if (auth.currentUser) {
+      const userRef = ref_d(database, `userdata/${auth.currentUser.uid}`);
+      // const snapshot = await userRef.value()
+
+      const unsubscribe = onValue(userRef, (snapshot) => {
+        const userData = snapshot.val();
+        console.log('USERDATA: ', userData.role)
+        if (userData && userData.role && userData.role.isAdmin) {
+          setIsAdmin(true);
+        }
+      });
+      return () => unsubscribe();
+    }
+    
+  };
 
   const checkNotificationStatus = async () => {
     const { status } = await Notifications.getPermissionsAsync();
@@ -70,8 +92,9 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
 
   const toggleFilters = () => {
     setShowFilters(!showFilters);
+    console.log(isAdmin)
     Animated.timing(filterHeight, {
-      toValue: showFilters ? 0 : 200,
+      toValue: showFilters ? 0 : isAdmin ? 300 : 200,
       duration: 300,
       useNativeDriver: false,
     }).start();
@@ -90,6 +113,47 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
   const handleAccountDelete = () => {
     navigation.navigate("AccountDeletion");
   };
+
+  const exportUserData = async () => {
+    try {
+      // Show loading indicator
+      Alert.alert("Traitement en cours", "Génération du rapport et envoi en cours...");
+      
+      // Get current user token for authentication
+      const idToken = await auth.currentUser.getIdToken();
+      console.log("Got token:", idToken.substring(0, 10) + "...");
+      
+      // Call the cloud function with authentication
+      console.log("Sending request to function...");
+      const response = await fetch('https://emailuserdata-akam5j3lyq-uc.a.run.app/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log("Response status:", response.status);
+      const responseText = await response.text();
+      console.log("Response body:", responseText);
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${responseText}`);
+      }
+      
+      // Show success message
+      Alert.alert(
+        "Succès",
+        "Le rapport a été généré et envoyé avec succès à l'adresse e-mail administrateur."
+      );
+    } catch (error) {
+      console.error("Error details:", error);
+      Alert.alert(
+        "Erreur",
+        "Une erreur est survenue: " + error.message
+      );
+    }
+  };
   return (
     <View style={styles.container}>
       <Text style={styles.contextText}>Cette application est conçue pour soutenir le déroulement des formations au sein des organisations partenaires.</Text>
@@ -103,7 +167,7 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
           </TouchableOpacity>
 
           <Animated.View style={[styles.filtersContainer, { height: filterHeight }]}>
-          <TouchableOpacity style={styles.filterContainer} >
+            <TouchableOpacity style={styles.filterContainer} >
               <Text style={styles.filterTextTop}>Compte de {auth.currentUser.email}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.filterContainer} onPress={openSupportWebsite}>
@@ -115,6 +179,16 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
             <TouchableOpacity style={styles.filterContainer} onPress={handleAccountDelete}>
               <Text style={styles.filterText}>Supprimer mon compte</Text>
             </TouchableOpacity>
+            
+            {isAdmin && (
+              <TouchableOpacity 
+                style={[styles.filterContainer, styles.adminActionContainer]} 
+                onPress={exportUserData}
+              >
+                <Text style={styles.adminActionText}>Exporter les données utilisateurs (PDF)</Text>
+                <Ionicons name="document-text-outline" size={24} color="#1a53ff" />
+              </TouchableOpacity>
+            )}
           </Animated.View>
         </View>
       )}
@@ -137,7 +211,6 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
   );
 };
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     padding: 16,
@@ -189,13 +262,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 8,
   },
-  // visitButton: {
-  //   backgroundColor: '#4a90e2',
-  //   paddingVertical: 6,
-  //   paddingHorizontal: 12,
-  //   borderRadius: 4,
-  //   alignSelf: 'flex-start',
-  // },
   visitButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -226,7 +292,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
-  
   filterSection: {
     marginBottom: 15,
     paddingHorizontal: 10,
@@ -240,11 +305,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-
   filterButtonSelected: {
     backgroundColor: '#1a53ff',
   },
-
   filterButtonTextSelected: {
     color: 'white',
   },
@@ -263,7 +326,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderRadius: 5,
   },
-
   filterText: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -271,6 +333,16 @@ const styles = StyleSheet.create({
   filterTextTop: {
     fontSize: 20,
     fontWeight: '900',
+  },
+  adminActionContainer: {
+    backgroundColor: '#f8f8f8',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1a53ff',
+  },
+  adminActionText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a53ff',
   },
 });
 
