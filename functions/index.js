@@ -10,6 +10,8 @@ setGlobalOptions({maxInstances: 10});
 const {onValueCreated, onValueUpdated} = require("firebase-functions/v2/database");
 const {onRequest} = require("firebase-functions/v2/https");
 
+// const {PDFDocument, rgb, StandardFonts} = require('pdf-lib');
+
 // Helper function to send notification
 const sendNotification = async (expoPushToken, data, id, uid) => {
   const chunks = expo.chunkPushNotifications([{ to: expoPushToken, ...data }]);
@@ -179,7 +181,7 @@ exports.onInscriptionValidation = onValueUpdated({
   await sendEmail(emailPayload);
 });
 
-
+// DISABLED FOR TESTING ON 19 JAN
 exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on creation.
   ref: "/formations/{formationId}",
   instance: "appdolivier-default-rtdb",
@@ -249,6 +251,8 @@ exports.onAdminFormationCreation = onValueCreated({ // to change to admin id on 
 
   await sendEmail(emailPayload);
 });
+
+// END OF ADMIN FORMATION CREATION.. //////////////////////////////////////////////
 
 
 // exports.onFormationVisible = onValueUpdated({
@@ -594,3 +598,172 @@ exports.sendMail = onRequest((req, res) => {
 });
 
 
+exports.emailUserData = onRequest({
+  cors: true,  // Enable CORS support
+  region: "us-central1"  // Match your existing region
+}, async (req, res) => {
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(403).send('Unauthorized: No valid token provided');
+  }
+  
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    // Optional: Check if user is admin
+    const uid = decodedToken.uid;
+    const userRef = admin.database().ref(`userdata/${uid}/role/isAdmin`);
+    const isAdminSnapshot = await userRef.once('value');
+    const isAdmin = isAdminSnapshot.val();
+      
+    if (!isAdmin) {
+      return res.status(403).send('Unauthorized: Admin access required');
+    }
+
+    try {
+      // Fetch all user data
+      const usersSnapshot = await admin.database().ref('userdata').once('value');
+      const users = usersSnapshot.val();
+      
+      if (!users) {
+        return res.status(404).send('No users found');
+      }
+
+      // Create email content
+      let emailContent = `
+      <style>
+        table {
+          border-collapse: collapse;
+          width: 100%;
+          font-family: Arial, sans-serif;
+        }
+        th {
+          background-color: #f2f2f2;
+          text-align: left;
+          padding: 12px;
+          border: 1px solid #ddd;
+        }
+        td {
+          padding: 10px;
+          border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        h2, h3 {
+          font-family: Arial, sans-serif;
+          color: #333;
+        }
+        .status-validated {
+          color: green;
+          font-weight: bold;
+        }
+        .status-pending {
+          color: orange;
+          font-weight: bold;
+        }
+        .status-rejected {
+          color: red;
+          font-weight: bold;
+        }
+        ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+      </style>
+      <h2>Esculappl User Data Report</h2>
+      <h3>Date: ${new Date().toLocaleString('fr-FR')}</h3>
+      <table>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+        </tr>`;
+      
+      // Process each user
+      for (const [uid, userData] of Object.entries(users)) {
+        // Extract user info safely
+        const firstName = userData.name?.prenom || userData.prenom || '';
+        const lastName = userData.name?.nom || userData.nom || '';
+        const fullName = `${firstName} ${lastName}`.trim() || 'Unknown User';
+        
+        // Get email safely
+        let email = '';
+        if (typeof userData.email === 'string') {
+          email = userData.email;
+        } else if (userData.email && typeof userData.email === 'object' && userData.email.email) {
+          email = userData.email.email;
+        } else {
+          email = 'No email available';
+        }
+        
+        // Check if user has any status in demandes
+        let status = 'No active requests';
+        try {
+          const demandesSnapshot = await admin.database().ref(`demandes/${uid}`).once('value');
+          const demandes = demandesSnapshot.val();
+          
+          if (demandes) {
+            // If user has active requests, format them for display
+            status = '<ul>';
+            for (const [formationId, formationData] of Object.entries(demandes)) {
+              const adminStatus = formationData.admin || 'Pending';
+              const formationTitle = formationData.formationTitle || 'Unknown Formation';
+              
+              let statusClass = '';
+              if (adminStatus === 'Validée') {
+                statusClass = 'status-validated';
+              } else if (adminStatus === 'Rejetée') {
+                statusClass = 'status-rejected';
+              } else if (adminStatus === 'Pending') {
+                statusClass = 'status-pending';
+              }
+              
+              status += `<li>${formationTitle}: <span class="${statusClass}">${adminStatus}</span></li>`;
+            }
+            status += '</ul>';
+          }
+        } catch (error) {
+          console.error(`Error fetching demandes for user ${uid}:`, error);
+          status = 'Error fetching status';
+        }
+        
+        // Add user row to email content
+        emailContent += `<tr>
+                         <td>${fullName}</td>
+                         <td>${email}</td>
+                         <td>${status}</td>
+                       </tr>`;
+      }
+      
+      emailContent += '</table>';
+      
+      // Send email
+      const mailOptions = {
+        from: 'Esculappl Admin <contact.esculappl@gmail.com>',
+        to: 'thomaxarstens@gmail.com', // Change to your admin email
+        subject: 'Esculappl User Data Report',
+        html: emailContent
+      };
+      
+      await transporter.sendMail(mailOptions);
+      
+      console.info('Email sent successfully');
+      return res.status(200).send('User data email sent successfully!');
+      
+    } catch (error) {
+      console.error('Error processing user data:', error);
+      return res.status(500).send(`Error processing request: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    return res.status(403).send('Unauthorized: Invalid token');
+  }
+});
