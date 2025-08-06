@@ -14,33 +14,7 @@ import {
 import { auth, firebase, storage, database } from '../../firebase';
 import { ref as ref_d, set, get, onValue, update } from 'firebase/database';
 import { WebView } from 'react-native-webview';
-// import { Audio, Video as OriginalVideo } from 'expo-av';
-import { Audio, Video } from 'expo-av';
-
-const triggerAudio = async (ref) => {
-  await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-  ref.current.playAsync();
-};
-
-// const Video = ({ ...props }) => {
-//   const ref = useRef(null);
-//   const [status, setStatus] = useState({});
-
-//   useEffect(() => {
-//     if (status.isPlaying) triggerAudio(ref);
-//   }, [ref, status.isPlaying]);
-
-//   return (
-//     <OriginalVideo
-//       ref={ref}
-//       onPlaybackStatusUpdate={(status) => setStatus(status)}
-//       useNativeControls
-//       {...props}
-//     />
-//   );
-// };
-
-
+import { Video, Audio } from 'expo-av';
 
 const FormationScreen = ({ route, navigation }) => {
   const { formationId, role } = route.params;
@@ -61,12 +35,36 @@ const FormationScreen = ({ route, navigation }) => {
   });
   const [videoError, setVideoError] = useState(false);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
-  const [videoPaused, setVideoPaused] = useState(false);
+  const [videoPaused, setVideoPaused] = useState(true);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   
   const videoRef = useRef(null);
   const webViewRef = useRef(null);
+
+  // iOS Audio Session Configuration
+  useEffect(() => {
+    const configureAudioSession = async () => {
+      if (Platform.OS === 'ios') {
+        try {
+          await Audio.setAudioModeAsync({
+            // allowsRecordingIOS: false,
+            // interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+            playsInSilentModeIOS: true, // This is crucial - allows audio even when silent switch is on
+            // staysActiveInBackground: false,
+            // interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+            // shouldDuckAndroid: true,
+            // playThroughEarpieceAndroid: false,
+          });
+          console.log('Audio session configured for iOS');
+        } catch (error) {
+          console.error('Failed to configure audio session:', error);
+        }
+      }
+    };
+
+    configureAudioSession();
+  }, []);
 
   // Navigation setup
   useEffect(() => {
@@ -82,10 +80,6 @@ const FormationScreen = ({ route, navigation }) => {
       },
     });
   }, [navigation]);
-
-  useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-}, []);
 
   // Helper function to extract YouTube video ID and get direct URL
   const extractYouTubeVideoData = async (url) => {
@@ -177,12 +171,22 @@ const FormationScreen = ({ route, navigation }) => {
     return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
   };
 
-  // Video event handlers for expo-av
-  const onVideoLoad = (status) => {
+  // Video event handlers for expo-av with iOS audio handling
+  const onVideoLoad = async (status) => {
     if (status.isLoaded) {
       setIsVideoLoading(false);
       setVideoError(false);
       setVideoDuration(status.durationMillis / 1000);
+      
+      // Ensure audio is enabled on iOS
+      if (Platform.OS === 'ios' && videoRef.current) {
+        try {
+          await videoRef.current.setIsMutedAsync(false);
+          console.log('Audio unmuted for iOS');
+        } catch (error) {
+          console.error('Failed to unmute audio:', error);
+        }
+      }
     }
   };
 
@@ -355,6 +359,40 @@ const FormationScreen = ({ route, navigation }) => {
             onPlaybackStatusUpdate={onVideoLoad}
             onError={onVideoError}
             posterSource={videoData.thumbnail ? { uri: videoData.thumbnail } : undefined}
+            // iOS-specific audio settings
+            isMuted={false} // Explicitly set to false
+            volume={1.0} // Full volume
+            audioOnly={false}
+            useLegacyImplementation={false}
+            progressUpdateIntervalMillis={500}
+            positionMillis={0}
+            onLoadStart={() => {
+              setIsVideoLoading(true);
+              console.log('Video loading started');
+            }}
+            onLoad={async (status) => {
+              console.log('Video loaded with status:', status);
+              await onVideoLoad(status);
+              
+              // Double-check audio is unmuted on iOS
+              if (Platform.OS === 'ios' && videoRef.current) {
+                try {
+                  const currentStatus = await videoRef.current.getStatusAsync();
+                  console.log('Current video status:', {
+                    isMuted: currentStatus.isMuted,
+                    volume: currentStatus.volume,
+                    shouldPlay: currentStatus.shouldPlay
+                  });
+                  
+                  if (currentStatus.isMuted) {
+                    await videoRef.current.setIsMutedAsync(false);
+                    console.log('Forced unmute on iOS');
+                  }
+                } catch (error) {
+                  console.error('Error checking/setting audio status:', error);
+                }
+              }
+            }}
           />
           {isVideoLoading && (
             <View style={styles.videoLoadingOverlay}>
@@ -377,30 +415,47 @@ const FormationScreen = ({ route, navigation }) => {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={true}
-            onLoad={() => setIsVideoLoading(false)}
-            onError={() => setVideoError(true)}
+            onLoad={() => {
+              console.log('WebView loaded successfully');
+              setIsVideoLoading(false);
+            }}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.log('WebView error:', nativeEvent);
+              setVideoError(true);
+            }}
             allowsFullscreenVideo={true}
             mediaPlaybackRequiresUserAction={false}
             scalesPageToFit={false}
             bounces={false}
             scrollEnabled={false}
+            // iOS-specific WebView settings
+            allowsInlineMediaPlayback={true}
+            mixedContentMode="compatibility"
           />
         </View>
       );
     }
 
-    // Error state with simplified messaging
+    // Error state with more helpful messaging
     return (
       <View style={styles.videoErrorContainer}>
         <Text style={styles.videoErrorText}>Impossible de charger la vidéo</Text>
         <Text style={styles.videoErrorSubtext}>
-          {videoData.type === 'youtube' && 'YouTube'} 
-          {videoData.type === 'googledrive' && 'Google Drive'} 
-          {videoData.type === 'direct' && 'Vidéo'}
+          {videoData.type === 'youtube' && 'Vidéo YouTube'} 
+          {videoData.type === 'googledrive' && 'Vidéo Google Drive'} 
+          {videoData.type === 'direct' && 'Vidéo directe'}
+          {Platform.OS === 'ios' && ' - Vérifiez votre connexion internet'}
         </Text>
+        {Platform.OS === 'ios' && (
+          <Text style={styles.audioTipText}>
+            💡 Astuce: Vérifiez que le commutateur silencieux de votre iPhone n'est pas activé
+          </Text>
+        )}
         <TouchableOpacity 
           style={styles.retryButton}
           onPress={() => {
+            console.log('Retrying video load...');
             setVideoError(false);
             setIsVideoLoading(true);
           }}
@@ -811,6 +866,14 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     marginBottom: 20,
+  },
+
+  audioTipText: {
+    fontSize: 12,
+    color: '#ff6600',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
   
   retryButton: {

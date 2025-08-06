@@ -157,7 +157,7 @@ const OrganizationsPartenairesScreen = ({navigation}) => {
   return (
     <View style={styles.container}>
       <Text style={styles.contextText}>Cette application est conçue pour soutenir le déroulement des formations au sein des organisations partenaires.</Text>
-      <Text style={styles.contextText}>Version du 20 octobre 2024 (version 1.1.0). </Text>
+      <Text style={styles.contextText}>Version du 1 septembre 2025 (version 1.4.0). </Text>
 
       {auth.currentUser && (
         <View>

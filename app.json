@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "bundleIdentifier": "com.olivierdumay.appdolivier-admin",
-      "buildNumber": "35",
+      "buildNumber": "43",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -54,7 +54,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "react-native-video"
     ],
     "web": {
       "bundler": "metro",
