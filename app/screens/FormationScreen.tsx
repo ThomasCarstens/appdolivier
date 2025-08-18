@@ -355,6 +355,7 @@ const FormationScreen = ({ route, navigation }) => {
             onPlaybackStatusUpdate={onVideoLoad}
             onError={onVideoError}
             posterSource={videoData.thumbnail ? { uri: videoData.thumbnail } : undefined}
+            isMuted={false} // Start muted for autoplay
           />
           {isVideoLoading && (
             <View style={styles.videoLoadingOverlay}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Text, TextInput, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, ScrollView, Text, TextInput, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ref as ref_d, set, get } from 'firebase/database';
@@ -10,9 +10,6 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import RNPdf from 'react-native-pdf';
 import * as DocumentPicker from 'expo-document-picker';
-import * as AuthSession from 'expo-auth-session';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
 // import { Media } from '@models/shared/Media'
 // import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 
@@ -27,7 +24,6 @@ const AjoutFormationScreen = ({ navigation, route }) => {
     date_de_fin: new Date(),
     image: 'https://via.placeholder.com/150',
     pdf: '',
-    videoUrl: '', // Add video URL field
     region: '',
     lieu: '',
     status: 'propose', //temporary, only admin can make formations in Phase 2, needs to change in Phase 3
@@ -50,6 +46,7 @@ const AjoutFormationScreen = ({ navigation, route }) => {
     competencesAcquises: '',
     prerequis: '',
     instructions: '',
+    videoUrl: '',
     admin: 'validée', //temporary, only admin can make formations in Phase 2, needs to change in Phase 3
   });
 
@@ -71,33 +68,13 @@ const AjoutFormationScreen = ({ navigation, route }) => {
     name: null,
     uri: null
   });
-
-  // Video upload related state
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<{
-    name: string;
-    uri: string;
-    size: number;
-    mimeType: string;
-  } | null>(null);
-
-  // Google OAuth configuration
-  const CLIENT_ID = '349759213253-mu3vsaaq17hk9t25aaad8ml0ppbvu780.apps.googleusercontent.com';
-  const REDIRECT_URI = AuthSession.makeRedirectUri({
-    scheme: 'com.googleusercontent.apps.349759213253-mu3vsaaq17hk9t25aaad8ml0ppbvu780',
+  const [videoUri, setVideoUri] = useState(null);
+  const [videoThumbnail, setVideoThumbnail] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState({
+    name: null,
+    uri: null,
+    size: null
   });
-
-  // Google Drive API endpoints
-  const DISCOVERY = {
-    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  };
-
-  // Google Drive Videos folder ID
-  const VIDEOS_FOLDER_ID = '13MhaE77cnPsBgx0E_viUhgWvTzLkIVxD';
-
   useEffect(() => {
     downloadFilterOptions();
     // ... (keep existing useEffect logic)
@@ -133,22 +110,6 @@ const AjoutFormationScreen = ({ navigation, route }) => {
       });
     }
   }, [route.params?.formation]);
-
-  // Load stored access token on component mount
-  useEffect(() => {
-    loadStoredAccessToken();
-  }, []);
-
-  const loadStoredAccessToken = async () => {
-    try {
-      const storedToken = await AsyncStorage.getItem('google_access_token');
-      if (storedToken) {
-        setAccessToken(storedToken);
-      }
-    } catch (error) {
-      console.error('Error loading stored access token:', error);
-    }
-  };
 
   const handleInputChange = (name, value) => {
     setFormData(prevState => ({
@@ -465,281 +426,12 @@ const uploadImageAsync = async (): Promise<any> => {
     }
     return null;
   };
-
-  // Google Drive Authentication Functions
-  const authenticateWithGoogle = async () => {
-    try {
-      const request = new AuthSession.AuthRequest({
-        clientId: CLIENT_ID,
-        scopes: ['https://www.googleapis.com/auth/drive.file'],
-        responseType: AuthSession.ResponseType.Code,
-        redirectUri: REDIRECT_URI,
-        additionalParameters: {},
-        prompt: AuthSession.Prompt.Consent,
-      });
-
-      const result = await request.promptAsync(DISCOVERY);
-
-      if (result.type === 'success') {
-        // Exchange code for access token
-        const tokenResponse = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: CLIENT_ID,
-            code: result.params.code,
-            redirectUri: REDIRECT_URI,
-            extraParams: {
-              code_verifier: request.codeVerifier,
-            },
-          },
-          DISCOVERY
-        );
-
-        setAccessToken(tokenResponse.accessToken);
-        // Store token for persistence
-        await AsyncStorage.setItem('google_access_token', tokenResponse.accessToken);
-        Alert.alert('Success', 'Authenticated with Google Drive!');
-        return tokenResponse.accessToken;
-      } else {
-        Alert.alert('Error', 'Authentication failed');
-        return null;
-      }
-    } catch (error) {
-      console.error('Authentication error:', error);
-      Alert.alert('Error', 'Authentication failed');
-      return null;
-    }
-  };
-
-  // Helper function to validate video format
-  const isValidVideoFormat = (uri: string) => {
-    const extension = uri.split('.').pop()?.toLowerCase();
-    const supportedFormats = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'mkv'];
-    return supportedFormats.includes(extension || '');
-  };
-
-  const selectVideo = async () => {
-    try {
-      // Request media library permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Error', 'Permission to access media library is required to upload a video.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: true,
-        quality: 1,
-        videoMaxDuration: 300, // 5 minutes max
-        presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const video = result.assets[0];
-
-        // Validate video format
-        if (!isValidVideoFormat(video.uri)) {
-          Alert.alert(
-            'Format non supporté',
-            'Veuillez sélectionner une vidéo dans un format supporté: MP4, MOV, AVI, WMV, FLV, WebM, M4V, 3GP, MKV',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        // Check file size (limit to 100MB)
-        const maxSize = 100 * 1024 * 1024; // 100MB in bytes
-        if (video.fileSize && video.fileSize > maxSize) {
-          Alert.alert(
-            'Fichier trop volumineux',
-            'La vidéo ne doit pas dépasser 100MB. Veuillez choisir une vidéo plus petite ou la compresser.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        // Detect video format from URI or use default
-        const getVideoFormat = (uri: string) => {
-          const extension = uri.split('.').pop()?.toLowerCase();
-          switch (extension) {
-            case 'mp4':
-              return { ext: 'mp4', mimeType: 'video/mp4' };
-            case 'mov':
-              return { ext: 'mov', mimeType: 'video/mp4' };
-            case 'avi':
-              return { ext: 'avi', mimeType: 'video/x-msvideo' };
-            case 'wmv':
-              return { ext: 'wmv', mimeType: 'video/x-ms-wmv' };
-            case 'flv':
-              return { ext: 'flv', mimeType: 'video/x-flv' };
-            case 'webm':
-              return { ext: 'webm', mimeType: 'video/webm' };
-            case 'm4v':
-              return { ext: 'm4v', mimeType: 'video/x-m4v' };
-            case '3gp':
-              return { ext: '3gp', mimeType: 'video/3gpp' };
-            case 'mkv':
-              return { ext: 'mkv', mimeType: 'video/x-matroska' };
-            default:
-              return { ext: 'mp4', mimeType: 'video/mp4' };
-          }
-        };
-
-        const videoFormat = getVideoFormat(video.uri);
-
-        // Convert ImagePicker result to match DocumentPicker format
-        const formattedVideo = {
-          name: `video_${Date.now()}.${videoFormat.ext}`,
-          uri: video.uri,
-          size: video.fileSize || 0,
-          mimeType: videoFormat.mimeType
-        };
-        setSelectedVideo(formattedVideo);
-
-        // Show success message with format info
-        Alert.alert(
-          'Vidéo sélectionnée',
-          `Format: ${videoFormat.ext.toUpperCase()}\nTaille: ${formatFileSize(video.fileSize || 0)}`,
-          [{ text: 'OK' }]
-        );
-
-        console.log('Selected video:', formattedVideo);
-      }
-    } catch (error) {
-      console.error('Error selecting video:', error);
-      Alert.alert('Error', error);
-    }
-  };
-
-  const uploadVideoToGoogleDrive = async () => {
-    if (!selectedVideo) {
-      return '';
-    }
-
-    // Validate video format before upload
-    if (!isValidVideoFormat(selectedVideo.uri)) {
-      Alert.alert('Erreur', 'Format vidéo non supporté pour l\'upload');
-      return '';
-    }
-
-    let token = accessToken;
-    if (!token) {
-      token = await authenticateWithGoogle();
-      if (!token) return '';
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    try {
-      console.log(`Uploading video: ${selectedVideo.name} (${selectedVideo.mimeType})`);
-
-      // Read file as base64
-      const fileContent = await FileSystem.readAsStringAsync(selectedVideo.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Create metadata with specific folder and proper MIME type
-      const metadata = {
-        name: selectedVideo.name,
-        parents: [VIDEOS_FOLDER_ID], // Upload to Videos folder
-        mimeType: selectedVideo.mimeType, // Ensure correct MIME type is set
-      };
-
-      // Create multipart upload body
-      const delimiter = '-------314159265358979323846';
-      const close_delim = `\r\n--${delimiter}--`;
-
-      let body = `--${delimiter}\r\n`;
-      body += 'Content-Type: application/json\r\n\r\n';
-      body += JSON.stringify(metadata) + '\r\n';
-      body += `--${delimiter}\r\n`;
-      body += `Content-Type: ${selectedVideo.mimeType}\r\n`;
-      body += 'Content-Transfer-Encoding: base64\r\n\r\n';
-      body += fileContent;
-      body += close_delim;
-
-      // Upload to Google Drive
-      const response = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': `multipart/related; boundary="${delimiter}"`,
-          },
-          body: body,
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-
-        // Make the file publicly shareable
-        await makeFilePublic(result.id, token);
-
-        // Generate shareable link
-        const shareableLink = `https://drive.google.com/file/d/${result.id}/view?usp=sharing`;
-
-        Alert.alert('Success', `Video uploaded successfully!`);
-        setSelectedVideo(null);
-        setUploadProgress(100);
-
-        return shareableLink;
-      } else {
-        const errorText = await response.text();
-        console.error('Upload failed:', errorText);
-        Alert.alert('Error', 'Failed to upload video');
-        return '';
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload video');
-      return '';
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  const makeFilePublic = async (fileId, token) => {
-    try {
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            role: 'reader',
-            type: 'anyone',
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        console.error('Failed to make file public');
-      }
-    } catch (error) {
-      console.error('Error making file public:', error);
-    }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   const validateForm = () => {
     let isValid = true;
     let newErrors = {};
 
     // Check required fields
+    const requiredFields = ['title', 'date', 'heureDebut', 'heureFin', 'lieu', 'region', 'nature', 'anneeConseillee', 'tarifEtudiant', 'tarifMedecin', 'domaine', 'affiliationDIU', 'inscriptionStatus'];    
     requiredFields.forEach(field => {
       if (!formData[field]) {
         newErrors[field] = 'Ce champ est obligatoire';
@@ -820,58 +512,152 @@ const uploadImageAsync = async (): Promise<any> => {
     }
   };
 
-  const uploadToFirebase = async () => {
-    if (validateForm()) {
-      try {
-        console.log('Starting uploads');
+const uploadToFirebase = async () => {
+  if (validateForm()) {
+    try {
+      console.log('Starting uploads');
+      
+      // Show loading alert
+      Alert.alert('Uploading', 'Please wait while files are being uploaded...');
+      
+      // Upload image, PDF, and video in parallel
+      const [imageUrl, pdfUrl, videoUrl] = await Promise.all([
+        uploadImageAsync(),
+        uploadPdfToFirebase(),
+        uploadVideoToFirebase()
+      ]);
+      
+      const formattedData = {
+        ...formData,
+        date: formData.date.toISOString().split('T')[0],
+        date_de_fin: formData.date_de_fin.toISOString().split('T')[0],
+        heureDebut: formData.heureDebut.toTimeString().split(' ')[0].slice(0, 5),
+        heureFin: formData.heureFin.toTimeString().split(' ')[0].slice(0, 5),
+        domaine: formData.domaine === 'Autre' ? formData.autresDomaine : formData.domaine,
+        lieu: formData.lieu === 'Autre' ? formData.autreLieu : formData.lieu,
+        region: formData.region === 'Autre' ? formData.autreRegion : formData.region,
+        nature: formData.nature === 'Autre' ? formData.autreNature : formData.nature,
+        anneeConseillee: formData.anneeConseillee.includes('Autre') ? 
+          formData.anneeConseillee.concat([formData.autreAnneeConseillee]) : 
+          formData.autreAnneeConseillee ? 
+            formData.anneeConseillee.filter(e => e !== formData.autreAnneeConseillee) : 
+            formData.anneeConseillee,
+        affiliationDIU: formData.affiliationDIU === 'Autre' ? formData.autreAffiliationDIU : formData.affiliationDIU,
+        image: imageUrl || formData.image,
+        pdf: pdfUrl || formData.pdf,
+        videoUrl: videoUrl || formData.videoUrl || null, // Add video URL
+        inscriptionURL: formData.inscriptionURL && 
+          (!formData.inscriptionURL.startsWith("http://") && !formData.inscriptionURL.startsWith("https://")) ? 
+          "http://" + formData.inscriptionURL : formData.inscriptionURL || null,
+        inscriptionStatus: formData.inscriptionStatus
+      };
 
-        // Upload image, PDF, and video in parallel
-        const [imageUrl, pdfUrl, videoUrl] = await Promise.all([
-          uploadImageAsync(),
-          uploadPdfToFirebase(),
-          uploadVideoToGoogleDrive()
-        ]);
-
-        const formattedData = {
-          ...formData,
-          date: formData.date.toISOString().split('T')[0],
-          date_de_fin: formData.date_de_fin.toISOString().split('T')[0],
-          heureDebut: formData.heureDebut.toTimeString().split(' ')[0].slice(0, 5),
-          heureFin: formData.heureFin.toTimeString().split(' ')[0].slice(0, 5),
-          domaine: formData.domaine === 'Autre' ? formData.autresDomaine : formData.domaine,
-          lieu: formData.lieu === 'Autre' ? formData.autreLieu : formData.lieu,
-          region: formData.region === 'Autre' ? formData.autreRegion : formData.region,
-          nature: formData.nature === 'Autre' ? formData.autreNature : formData.nature,
-          anneeConseillee: formData.anneeConseillee.includes('Autre') ? formData.anneeConseillee.concat([formData.autreAnneeConseillee]) :
-          formData.autreAnneeConseillee ? formData.anneeConseillee.filter(e => e !== formData.autreAnneeConseillee) : formData.anneeConseillee,
-          affiliationDIU: formData.affiliationDIU === 'Autre' ? formData.autreAffiliationDIU : formData.affiliationDIU,
-          image: imageUrl || formData.image,
-          pdf: pdfUrl || formData.pdf,
-          videoUrl: videoUrl || formData.videoUrl,
-          inscriptionURL: formData.inscriptionURL && (!formData.inscriptionURL.startsWith("http://") && !formData.inscriptionURL.startsWith("https://"))? "http://" + formData.inscriptionURL: formData.inscriptionURL || null,
-          inscriptionStatus: formData.inscriptionStatus
-        };
-
-        await set(ref_d(database, `formations/${formData.id}`), formattedData);
-        Alert.alert(
-          "Succès", 
-          route.params?.formation 
-            ? "La formation a été modifiée avec succès."
-            : "La formation a été ajoutée avec succès."
-        );
-        navigation.goBack();
-      } catch (error) {
-        Alert.alert("Erreur", "Une erreur s'est produite lors de l'opération.");
-        console.error(error);
-      }
-    } else {
-      Alert.alert("Erreur", "Veuillez remplir correctement tous les champs obligatoires.");
+      await set(ref_d(database, `formations/${formData.id}`), formattedData);
+      
+      Alert.alert(
+        "Succès", 
+        route.params?.formation 
+          ? "La formation a été modifiée avec succès."
+          : "La formation a été ajoutée avec succès."
+      );
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert("Erreur", "Une erreur s'est produite lors de l'opération.");
+      console.error('Upload error:', error);
     }
-  };
-  
+  } else {
+    Alert.alert("Erreur", "Veuillez remplir correctement tous les champs obligatoires.");
+  }
+};
 
-  // Define required fields
-  const requiredFields = ['title', 'date', 'date_de_fin', 'heureDebut', 'heureFin', 'lieu', 'nature', 'anneeConseillee', 'tarifEtudiant', 'tarifMedecin', 'domaine', 'affiliationDIU', 'inscriptionStatus'];
+const pickVideo = async () => {
+  try {
+    // Request media library permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Error', 'Permission to access media library is required to upload a video.');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      quality: 1,
+      videoMaxDuration: 300, // 5 minutes max
+    });
+
+    if (!result.canceled) {
+      const videoAsset = result.assets[0];
+      setVideoUri(videoAsset.uri);
+      setSelectedVideo({
+        name: `video_${Date.now()}.mp4`,
+        uri: videoAsset.uri,
+        size: videoAsset.fileSize
+      });
+
+      // Generate thumbnail for preview
+      try {
+        const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(
+          videoAsset.uri,
+          {
+            time: 1000, // 1 second into the video
+            quality: 0.7,
+          }
+        );
+        setVideoThumbnail(thumbnailUri);
+      } catch (thumbnailError) {
+        console.log('Error generating thumbnail:', thumbnailError);
+      }
+
+      Alert.alert('Success', 'Video selected successfully');
+    }
+  } catch (error) {
+    console.error('Error picking video:', error);
+    Alert.alert('Error', 'Failed to select video file');
+  }
+};
+
+
+const renderVideoSection = () => (
+  <View>
+    <Text style={styles.label}>Vidéo de présentation de la formation</Text>
+    <TouchableOpacity style={styles.videoPicker} onPress={pickVideo}>
+      {videoUri ? (
+        <View style={styles.videoContainer}>
+          {videoThumbnail ? (
+            <Image source={{ uri: videoThumbnail }} style={styles.videoThumbnail} />
+          ) : (
+            <Video
+              source={{ uri: videoUri }}
+              rate={1.0}
+              volume={1.0}
+              isMuted={true}
+              shouldPlay={false}
+              isLooping={false}
+              style={styles.videoPreview}
+              useNativeControls
+            />
+          )}
+          <View style={styles.videoOverlay}>
+            <Text style={styles.videoSelectedText}>Vidéo sélectionnée</Text>
+            <Text style={styles.videoName}>{selectedVideo.name}</Text>
+            {selectedVideo.size && (
+              <Text style={styles.videoSize}>
+                {(selectedVideo.size / (1024 * 1024)).toFixed(2)} MB
+              </Text>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.videoPlaceholder}>
+          <Text style={styles.videoPlaceholderText}>📹</Text>
+          <Text style={styles.videoPlaceholderSubtext}>Sélectionner une vidéo</Text>
+          <Text style={styles.videoPlaceholderInfo}>Max 5 minutes, 100MB</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  </View>
+);
 
   const renderInput = (label, name, placeholder, keyboardType = 'default', multiline = false) => (
     <View>
@@ -887,6 +673,8 @@ const uploadImageAsync = async (): Promise<any> => {
       {errors[name] && <Text style={styles.errorSummaryText}>{errors[name]}</Text>}
     </View>
   );
+
+  const requiredFields = ['title', 'date', 'date_de_fin', 'heureDebut', 'heureFin', 'lieu', 'nature', 'anneeConseillee', 'tarifEtudiant', 'tarifMedecin', 'domaine', 'affiliationDIU', 'inscriptionStatus'];
   
   const handleAnneeSelection = (annee) => {
     setFormData(prevState => {
@@ -1151,60 +939,6 @@ const uploadImageAsync = async (): Promise<any> => {
         )}
       </TouchableOpacity>
 
-      {/* Video Upload Section */}
-      <Text style={styles.label}>Vidéo de la formation (optionnel)</Text>
-      <Text style={styles.supportedFormats}>
-        Formats supportés: MP4, MOV, AVI, WMV, FLV, WebM, M4V, 3GP, MKV (max 100MB, 5min)
-      </Text>
-
-      {/* Google Authentication */}
-      <TouchableOpacity
-        style={[
-          styles.button,
-          accessToken ? styles.buttonSuccess : styles.buttonPrimary,
-          { marginBottom: 10 }
-        ]}
-        onPress={authenticateWithGoogle}
-        disabled={uploading}
-      >
-        <Ionicons
-          name={accessToken ? "checkmark-circle" : "log-in-outline"}
-          size={20}
-          color="white"
-        />
-        <Text style={styles.buttonText}>
-          {accessToken ? 'Google Drive Connecté ✓' : 'Se connecter à Google Drive'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Video Selection */}
-      <TouchableOpacity
-        style={[styles.button, styles.buttonSecondary, { marginBottom: 10 }]}
-        onPress={selectVideo}
-        disabled={uploading}
-      >
-        <Ionicons name="videocam-outline" size={20} color="white" />
-        <Text style={styles.buttonText}>Choisir une vidéo</Text>
-      </TouchableOpacity>
-
-      {selectedVideo && (
-        <View style={styles.fileInfo}>
-          <Ionicons name="videocam" size={24} color="#666" />
-          <View style={styles.fileDetails}>
-            <Text style={styles.fileName}>{selectedVideo.name}</Text>
-            <Text style={styles.fileSize}>
-              {formatFileSize(selectedVideo.size)}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {uploading && (
-        <View style={styles.uploadProgress}>
-          <ActivityIndicator size="small" color="#4285f4" />
-          <Text style={styles.uploadText}>Upload en cours...</Text>
-        </View>
-      )}
 
       <Text style={styles.label}>Programme PDF de la formation</Text>
       <Text style={styles.label}>[ Cette version n'est pas adaptée au format Android ]</Text>
@@ -1286,6 +1020,12 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: 'red',
   },
+  errorText: {
+    color: 'red',
+  },
+  errorSummary: {
+    color: 'red',
+  },
   multilineInput: {
     height: 100,
     textAlignVertical: 'top',
@@ -1339,12 +1079,6 @@ const styles = StyleSheet.create({
     color: 'green',
     textAlign: 'center',
   },
-  supportedFormats: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 10,
-    fontStyle: 'italic',
-  },
   errorText: {
     color: '#dc2626', // Tailwind red-600
     fontSize: 14,
@@ -1370,6 +1104,17 @@ const styles = StyleSheet.create({
   buttonContainer: {
     paddingHorizontal: 16,
     paddingVertical: 24,
+  },
+  button: {
+    backgroundColor: '#1a53ff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   anneeContainer: {
     marginBottom: 15,
@@ -1401,72 +1146,79 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 16,
   },
-  // Video upload styles
-  buttonPrimary: {
-    backgroundColor: '#4285f4',
-    flexDirection: 'row',
+    videoPicker: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  buttonSuccess: {
-    backgroundColor: '#34a853',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  buttonSecondary: {
-    backgroundColor: '#6c757d',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  fileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
+    height: 200,
     marginBottom: 10,
-    gap: 12,
+    backgroundColor: '#f9f9f9',
   },
-  fileDetails: {
-    flex: 1,
+  videoContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
   },
-  fileName: {
+  videoPreview: {
+    width: '100%',
+    height: '70%',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '70%',
+    resizeMode: 'cover',
+    borderRadius: 5,
+  },
+  videoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
+  },
+  videoSelectedText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  videoName: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  videoSize: {
+    color: '#ccc',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  videoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+  },
+  videoPlaceholderText: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  videoPlaceholderSubtext: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  fileSize: {
-    fontSize: 14,
     color: '#666',
+    marginBottom: 5,
   },
-  uploadProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-    marginBottom: 10,
-    gap: 8,
+  videoPlaceholderInfo: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
   },
-  uploadText: {
-    fontSize: 14,
-    color: '#1976d2',
-    fontWeight: '500',
-  },
-
 });
 
 export default AjoutFormationScreen;
