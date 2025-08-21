@@ -689,12 +689,12 @@ const uploadImageAsync = async (): Promise<any> => {
       } else {
         const errorText = await response.text();
         console.error('Upload failed:', errorText);
-        Alert.alert('Error', 'Failed to upload video');
+        Alert.alert('Response Upload Error', errorText);
         return '';
       }
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload video');
+      Alert.alert('Uncaught Upload Error', String(error));
       return '';
     } finally {
       setUploading(false);

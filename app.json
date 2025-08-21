@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "bundleIdentifier": "com.olivierdumay.esculappl-admin",
-      "buildNumber": "52",
+      "buildNumber": "53",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
