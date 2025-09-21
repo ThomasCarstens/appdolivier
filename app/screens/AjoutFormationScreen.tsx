@@ -1207,8 +1207,8 @@ const uploadImageAsync = async (): Promise<any> => {
       )}
 
       <Text style={styles.label}>Programme PDF de la formation</Text>
-      <Text style={styles.label}>[ Cette version n'est pas adaptée au format Android ]</Text>
-      {/* <TouchableOpacity style={styles.imagePicker} onPress={pickPDF}>
+      {/* <Text style={styles.label}>[ Cette version de l'app administrateur manque la section PDF. ]</Text> */}
+      <TouchableOpacity style={styles.imagePicker} onPress={pickPDF}>
         {selectedPdf ? (
           <View style={styles.pdfContainer}>
             <RNPdf
@@ -1234,7 +1234,7 @@ const uploadImageAsync = async (): Promise<any> => {
         ) : (
           <Text style={styles.text}>Cliquer pour choisir un PDF</Text>
         )} 
-      </TouchableOpacity> */}
+      </TouchableOpacity>
 
       {Object.keys(errors).length > 0 && (
       <View style={styles.errorSummary}>

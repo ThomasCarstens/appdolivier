@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Esculappl-Admin",
-    "slug": "esculappl-admin",
+    "slug": "appdolivier",
     "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/esculappl-admin-logo.jpg",
@@ -15,8 +15,8 @@
     "ios": {
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
-      "bundleIdentifier": "com.olivierdumay.esculappl-admin",
-      "buildNumber": "53",
+      "bundleIdentifier": "com.olivierdumay.appdolivier-admin",
+      "buildNumber": "55",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -27,7 +27,7 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.olivierdumay.esculappl-admin",
+      "package": "com.olivierdumay.appdolivier-admin",
       "versionCode": 61,
       "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
@@ -70,7 +70,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "d43c8c91-62ca-44d6-ba7d-2953cf552a2e"
+        "projectId": "51e2e72b-ed5c-4f8d-bc3e-86e58c5e5370"
       }
     }
   }
