@@ -1,8 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Alert, Dimensions, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Image, 
+  ScrollView, 
+  TouchableOpacity, 
+  Alert, 
+  Linking,
+  ActivityIndicator,
+  Platform 
+} from 'react-native';
 import { auth, firebase, storage, database } from '../../firebase';
 import { ref as ref_d, set, get, onValue, update } from 'firebase/database';
 import RNPdf from 'react-native-pdf';
+import { WebView } from 'react-native-webview';
+// import { Audio, Video as OriginalVideo } from 'expo-av';
+import { Audio, Video } from 'expo-av';
+
+const triggerAudio = async (ref) => {
+  await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+  ref.current.playAsync();
+};
+
 
 
 const FormationScreen = ({ route, navigation }) => {
@@ -13,7 +33,25 @@ const FormationScreen = ({ route, navigation }) => {
   const [isDateValid, setIsDateValid] = useState(true);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [inscriptionFormat, setInscriptionFormat] = useState(null);
-  const [inscriptionURL, setinscriptionURL] = useState('');
+  const [videoData, setVideoData] = useState({ 
+    id: null, 
+    type: null, 
+    embedUrl: null, 
+    directUrl: null,
+    thumbnail: null 
+  });
+  const [videoError, setVideoError] = useState(false);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [videoPaused, setVideoPaused] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  
+  const videoRef = useRef(null);
+  const webViewRef = useRef(null);
+
+  // Navigation setup
+  const [inscriptionURL, setInscriptionURL] = useState('');
+  
   useEffect(() => {
     navigation.setOptions({
       headerShown: true,
@@ -34,20 +72,161 @@ const FormationScreen = ({ route, navigation }) => {
     });
   }, [navigation]);
 
+  useEffect(() => {
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+}, []);
+
+  // Helper function to extract YouTube video ID and get direct URL
+  const extractYouTubeVideoData = async (url) => {
+    if (!url) return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+    
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/v\/([^&\n?#]+)/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        const videoId = match[1];
+        
+        return {
+          id: videoId,
+          type: 'youtube',
+          embedUrl: `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&controls=1&showinfo=0&fs=1&autoplay=0`,
+          directUrl: `https://www.youtube.com/watch?v=${videoId}`,
+          thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+        };
+      }
+    }
+    
+    return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+  };
+
+  // Helper function to extract Google Drive file ID and attempt to get direct URL
+  const extractGoogleDriveVideoData = async (url) => {
+    if (!url) return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+    
+    const drivePatterns = [
+      /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/,
+      /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/,
+      /docs\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/
+    ];
+    
+    for (const pattern of drivePatterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        const fileId = match[1];
+        
+        // Attempt to get direct video URL (may not always work due to permissions)
+        const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        const thumbnail = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+        
+        return { 
+          id: fileId, 
+          type: 'googledrive', 
+          embedUrl: embedUrl,
+          directUrl: directUrl,
+          thumbnail: thumbnail
+        };
+      }
+    }
+    
+    return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+  };
+
+  // Helper function to process video URL and determine type
+  const processVideoUrl = async (url) => {
+    if (!url) return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+    
+    // Check for YouTube first
+    const youtubeData = await extractYouTubeVideoData(url);
+    if (youtubeData.id) {
+      return youtubeData;
+    }
+    
+    // Check for Google Drive
+    const driveData = await extractGoogleDriveVideoData(url);
+    if (driveData.id) {
+      return driveData;
+    }
+    
+    // Check if it's already a direct video URL
+    if (url.match(/\.(mp4|mov|avi|wmv|flv|webm|m4v)(\?.*)?$/i)) {
+      return {
+        id: 'direct',
+        type: 'direct',
+        embedUrl: null,
+        directUrl: url,
+        thumbnail: formation?.image || null
+      };
+    }
+    
+    return { id: null, type: null, embedUrl: null, directUrl: null, thumbnail: null };
+  };
+
+  // Video event handlers for expo-av
+  const onVideoLoad = (status) => {
+    if (status.isLoaded) {
+      setIsVideoLoading(false);
+      setVideoError(false);
+      setVideoDuration(status.durationMillis / 1000);
+    }
+  };
+
+  const onVideoError = (error) => {
+    console.log('Video Error:', error);
+    setVideoError(true);
+    setIsVideoLoading(false);
+  };
+
+  const onVideoProgress = (status) => {
+    if (status.isLoaded) {
+      setVideoProgress(status.positionMillis / 1000);
+    }
+  };
+
+  // Helper function to get video source based on type
+  const getVideoSource = () => {
+    if (videoData.type === 'direct' && videoData.directUrl) {
+      return { uri: videoData.directUrl };
+    }
+    
+    // For YouTube, don't try to use directUrl - it won't work with expo-av
+    if (videoData.type === 'youtube') {
+      return null; // Force fallback to WebView
+    }
+    
+    if (videoData.type === 'googledrive' && videoData.directUrl) {
+      return { uri: videoData.directUrl };
+    }
+    
+    return null;
+  };
+
+  // Main data loading effect
 
 
 
   useEffect(() => {
     console.log(formationId)
     const formationRef = ref_d(database, `/formations/${formationId}`);
-    const unsubscribe = onValue(formationRef, (snapshot) => {
+    const unsubscribe = onValue(formationRef, async (snapshot) => {
       const data = snapshot.val();
       console.log(data)
       if (data) {
         setFormation(data);
-        setInscriptionFormat(data.inscriptionStatus)
-        if (data.inscriptionStatus === "Externe"){
-          setinscriptionURL(data.inscriptionURL)
+        setInscriptionFormat(data.inscriptionStatus);
+        
+        if (data.videoUrl) {
+          const videoInfo = await processVideoUrl(data.videoUrl);
+          setVideoData(videoInfo);
+        }
+        
+        if (data.inscriptionStatus === "Externe") {
+          setInscriptionURL(data.inscriptionURL);
+
         }
         checkDateValidity(data.date);
       } else {
@@ -60,15 +239,23 @@ const FormationScreen = ({ route, navigation }) => {
     const checkInscriptionStatus = async () => {
       const user = auth.currentUser;
       if (user) {
+                try {
+
         const demandeRef = ref_d(database, `/demandes/${user.uid}/${formationId}`);
         const snapshot = await get(demandeRef);
+
         if (snapshot.exists()) {
           setInscriptionStatus(snapshot.val().admin);
         } else {
           setInscriptionStatus(null);
+        }          
+        } catch (error) {
+          console.error('Error checking inscription status:', error);
+
         }
       }
     };
+
 
 
     
@@ -76,10 +263,17 @@ const FormationScreen = ({ route, navigation }) => {
     const checkConsent = async () => {
       const user = auth.currentUser;
       if (user) {
+        try {
+
         const consentRef = ref_d(database, `/consentement/${user.uid}`);
         const snapshot = await get(consentRef);
         
         setHasConsent(snapshot.val() === true);
+                } catch (error) {
+          console.error('Error checking consent:', error);
+          setHasConsent(false);
+        }
+
       }
     };
 
@@ -98,16 +292,147 @@ const FormationScreen = ({ route, navigation }) => {
     setIsDateValid(formationDate > twoDaysFromNow);
   };
 
+    // Create HTML for embed videos (YouTube/Google Drive fallback)
+  const createEmbedHTML = (embedUrl) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              margin: 0;
+              padding: 0;
+              background-color: #000;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              overflow: hidden;
+            }
+            .video-container {
+              position: relative;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+            }
+            iframe {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              border: none;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="video-container">
+            <iframe 
+              src="${embedUrl}"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen>
+            </iframe>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  // Render video player with expo-av and iOS audio optimization
+  const renderVideo = () => {
+    if (!videoData.id) return null;
+
+    const videoSource = getVideoSource();
+    
+    // Try expo-av Video first for direct URLs
+    if (videoSource && !videoError) {
+      return (
+        <View style={styles.videoPlayerContainer}>
+          <Video
+            ref={videoRef}
+            source={videoSource}
+            style={styles.videoPlayer}
+            useNativeControls
+            resizeMode="contain"
+            shouldPlay={!videoPaused}
+            onPlaybackStatusUpdate={onVideoLoad}
+            onError={onVideoError}
+            posterSource={videoData.thumbnail ? { uri: videoData.thumbnail } : undefined}
+            isMuted={false} // Start muted for autoplay
+          />
+          {isVideoLoading && (
+            <View style={styles.videoLoadingOverlay}>
+              <ActivityIndicator size="large" color="#ffffff" />
+              <Text style={styles.loadingVideoText}>Chargement de la vidéo...</Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    // Fallback to WebView for embed URLs
+    if (videoData.embedUrl && !videoError) {
+      return (
+        <View style={styles.videoWrapper}>
+          <WebView
+            ref={webViewRef}
+            style={styles.webView}
+            source={{ html: createEmbedHTML(videoData.embedUrl) }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            onLoad={() => setIsVideoLoading(false)}
+            onError={() => setVideoError(true)}
+            allowsFullscreenVideo={true}
+            mediaPlaybackRequiresUserAction={false}
+            scalesPageToFit={false}
+            bounces={false}
+            scrollEnabled={false}
+          />
+        </View>
+      );
+    }
+
+    // Error state with simplified messaging
+    return (
+      <View style={styles.videoErrorContainer}>
+        <Text style={styles.videoErrorText}>Impossible de charger la vidéo</Text>
+        <Text style={styles.videoErrorSubtext}>
+          {videoData.type === 'youtube' && 'YouTube'} 
+          {videoData.type === 'googledrive' && 'Google Drive'} 
+          {videoData.type === 'direct' && 'Vidéo'}
+        </Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            setVideoError(false);
+            setIsVideoLoading(true);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Registration handlers (keeping existing logic)
   const handleSignUp = async () => {
     const user = auth.currentUser;
     if (!user) {
       Alert.alert("Erreur", "Vous devez être connecté pour vous inscrire.");
       return;
     }
-    console.log('inscriptionStatus__ in handleSignup(): ', inscriptionStatus)
-    if (inscriptionStatus == 'en attente') {
-      Alert.alert(`Inscription ${inscriptionStatus}`, "Nous avons déjà une inscription de votre part. Pour plus d'informations sur votre inscription, contactez notre email d'assistance: contact.esculappl@gmail.com");
-      return;
+
+
+    if (inscriptionStatus === 'en attente') {
+      Alert.alert(
+        `Inscription ${inscriptionStatus}`, 
+        "Nous avons déjà une inscription de votre part. Pour plus d'informations, contactez: contact.esculappl@gmail.com"
+      );
+
+         return;
     }
     
     if (!isDateValid) {
@@ -135,7 +460,9 @@ const FormationScreen = ({ route, navigation }) => {
     }
 
     // Procéder à l'inscription
-    navigation.navigate('InscriptionFormation', { formationId: formation.id, formationTitle: formation.title });
+    navigation.navigate('InscriptionFormation', { 
+      formationId: formation.id, 
+      formationTitle: formation.title });
   };
 
   const handleUnsubscribe = () => {
@@ -156,13 +483,18 @@ const FormationScreen = ({ route, navigation }) => {
           const user = auth.currentUser;
           if (user) {
             // const demandeRef = ref_d(database, `/demandes/${user.uid}/${formationId}`);
-            await update(ref_d(database, `/demandes/${user.uid}/${formationId}`), { admin: "désinscrit" });
+              try {
+                await update(ref_d(database, `/demandes/${user.uid}/${formationId}`), { 
+                  admin: "désinscrit" 
+                });
 
-            
-            setInscriptionStatus("désinscrit");
             Alert.alert("Succès", "Vous avez été désinscrit de la formation.");
-          }
-        }}
+                        } catch (error) {
+                Alert.alert("Erreur", "Impossible de se désinscrire. Réessayez plus tard.");
+              }
+            }
+} 
+        }
       ]
     );
   };
@@ -246,18 +578,41 @@ const FormationScreen = ({ route, navigation }) => {
 
   if (!formation) {
     return (
-      <View style={styles.container}>
-        <Text>Chargement...</Text>
+        <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1a53ff" />
+        <Text style={styles.loadingText}>Chargement...</Text>
       </View>
     );
   }
 
 
   return (
-    <ScrollView style={styles.container}>
-      <Image source={{ uri: formation.image }} style={styles.image} />
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Video/Image Section */}
+      <View style={styles.mediaContainer}>
+        {videoData.id ? (
+          renderVideo()
+        ) : (
+          <View style={styles.imageContainer}>
+            <Image 
+              source={{ uri: formation.image }} 
+              style={styles.image}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Content Section */}
+      <View style={styles.contentContainer}>
+        {/* Header */}
+        <View style={styles.headerSection}>
+
       <Text style={styles.title}>{formation.title}</Text>
-      <Text style={styles.sectionTitle}>{formation.nature} de {formation.domaine}</Text>
+          <Text style={styles.subtitle}>
+            {formation.nature} de {formation.domaine}
+          </Text>
+        </View>
 
       {/* {(role.isAdmin === true) ? (
          <View style={styles.buttonContainer}>
@@ -292,8 +647,9 @@ const FormationScreen = ({ route, navigation }) => {
          )}
        </View>
       ) : ( */}
-        <View style={styles.buttonContainer}>
-         {formation.active && (
+        {/* <View style={styles.buttonContainer}>
+         {formation.active && ( */}
+         
            <TouchableOpacity 
              style={getButtonStyle()}
              onPress={handleButtonPress}
@@ -306,8 +662,6 @@ const FormationScreen = ({ route, navigation }) => {
                {getButtonText()}
              </Text>
            </TouchableOpacity>
-                       
-         )}
 
 
         </View>
@@ -320,7 +674,7 @@ const FormationScreen = ({ route, navigation }) => {
       <Text style={styles.info}>Tarif étudiant: {formation.tarifEtudiant} € / Tarif médecin: {formation.tarifMedecin} €</Text>
       
       <Text style={styles.sectionTitle}>Documentation PDF</Text>
-      {/* <Text style={styles.label}>[ Cette version n'est pas adaptée au format Android ]</Text> */}
+      {/* <Text style={styles.label}>[ Version Etudiante - Contacter Developpeur pour visionner les PDFs ]</Text> */}
       {formation.pdf ? (
         <View style={styles.pdfContainer}>
           <RNPdf trustAllCerts={false}
@@ -381,224 +735,321 @@ const FormationScreen = ({ route, navigation }) => {
     </ScrollView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
+    backgroundColor: '#ffffff',
   },
+    
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666666',
+  },
+  
+  mediaContainer: {
+    width: '100%',
+    height: 280,
+    backgroundColor: '#f8f9fa',
+  },
+    
+  imageContainer: {
+    width: '100%',
+    height: '100%',
+  },
+  
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  
+  videoPlayerContainer: {
+    width: '100%',
+    height: 280,
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+    
+  videoWrapper: {
+    width: '100%',
+    height: '100%',
+  },
+  
+  webView: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+    
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 2,
+  },
+  
+  loadingVideoText: {
+    color: '#ffffff',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  
+  videoErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 20,
+  },
+  
+  videoErrorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+    
+  videoErrorSubtext: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+    
+  retryButton: {
+    backgroundColor: '#1a53ff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+    
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+    
   contentContainer: {
-    padding: 15,
-    paddingBottom: 30, // Add extra padding at the bottom
+    flex: 1,
+    backgroundColor: '#ffffff',
   },
-  // image: {
-  //   width: '100%',
-  //   // height: 200,
-  //   marginBottom: 15,
-  //   borderRadius: 10,
-  // },
+  
+  headerSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#1a1a1a',
+    marginBottom: 8,
   },
+  
+  subtitle: {
+    fontSize: 16,
+    color: '#666666',
+  },
+    
+  buttonSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
+  
   signUpButton: {
     backgroundColor: '#1a53ff',
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-    marginRight: 5,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   modifyButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-    marginRight: 5,
-  },
-  deleteButton: {
-    backgroundColor: '#F44336',
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-  },
-  signUpButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  info: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 5,
-  },
-  text: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  // new styles:
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f5f7fa',
-  },
-  image: {
-    width: '100%',
-    height: 250,
-    marginBottom: 20,
+    backgroundColor: '#28a745',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  programmeImage: {
-    width: '100%',
-    height: 210,
-    marginBottom: 20,
-    // borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 20,
-    letterSpacing: 0.5,
-    lineHeight: 32,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 25,
-    gap: 10,
-  },
-  signUpButton: {
-    backgroundColor: '#1a53ff',
-    padding: 12,
-    borderRadius: 8,
     flex: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    alignItems: 'center',
+    marginHorizontal: 4,
   },
-  modifyButton: {
-    backgroundColor: '#2ecc71',
-    padding: 12,
-    borderRadius: 8,
-    flex: 1,
-    elevation: 2,
-  },
+  
   deleteButton: {
-    backgroundColor: '#e74c3c',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: '#dc3545',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     flex: 1,
-    elevation: 2,
+    alignItems: 'center',
+    marginHorizontal: 4,
   },
+  
   signUpButtonText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.5,
   },
+  
   buttonText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
   },
+
+  // Info sections
   info: {
     fontSize: 16,
-    marginBottom: 12,
-    color: '#34495e',
-    lineHeight: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginTop: 25,
-    marginBottom: 10,
-    letterSpacing: 0.5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e6ed',
-    paddingBottom: 8,
-  },
-  text: {
-    fontSize: 16,
-    marginBottom: 15,
-    color: '#34495e',
-    lineHeight: 24,
-    letterSpacing: 0.3,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  bottomSpacer: {
-    height: 60,
-  },
-  // container2: {
-  //   flex: 1,
-  //   justifyContent: 'flex-start',
-  //   alignItems: 'center',
-  //   marginTop: 25,
-  // },
-  // pdf: {
-  //     flex:1,
-  //     width:Dimensions.get('window').width,
-  //     height:Dimensions.get('window').height,
-  // },
-  pdfContainer: {
-    width: '100%',
-    height: 500, // Fixed height for PDF viewer
-    marginVertical: 15,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e6ed',
-  },
-  pdf: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f8f9fa',
-  },
-  yearsList: {
-    paddingLeft: 10,
-    marginTop: 5,
-  },
-  yearItem: {
-    fontSize: 16,
-    color: '#333',
-    marginVertical: 3,
+    color: '#333333',
+    marginBottom: 8,
+    paddingHorizontal: 20,
     lineHeight: 22,
   },
-});
+  
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginTop: 24,
+    marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  
+  text: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333333',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  
+  label: {
+    fontSize: 14,
+    color: '#666666',
+    fontStyle: 'italic',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  
+  // Years list styling
+  yearsList: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  
+  yearItem: {
+    fontSize: 16,
+    color: '#333333',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  
+  // PDF container (commented out in code but keeping for reference)
+  pdfContainer: {
+    height: 400,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  
+  pdf: {
+    flex: 1,
+    borderRadius: 8,
+  },
+  
+  // Program image (referenced in commented code)
+  programmeImage: {
+    width: '90%',
+    height: 300,
+    alignSelf: 'center',
+    marginVertical: 20,
+    borderRadius: 8,
+    resizeMode: 'contain',
+  },
+  
+  // Bottom spacer for scrolling
+  bottomSpacer: {
+    height: 40,
+  },
 
+  // Info Grid (for potential future use)
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 16,
+    gap: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+    
+  infoItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+  },
+  
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+    marginBottom: 4,
+  },
+  
+  infoValue: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  
+  descriptionSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333333',
+  },
+  
+  formateurSection: {
+    padding: 20,
+  },
+  
+  formateur: {
+    fontSize: 16,
+    color: '#1a53ff',
+    fontWeight: '500',
+  },
+});
 export default FormationScreen;
