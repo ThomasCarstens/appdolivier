@@ -1,28 +1,47 @@
+# appdolivier
 
+Management layer for medical training seminars. Practitioners and students browse, filter and enrol in continuing-education seminars; the organisations running them publish and administer their programmes from the same app.
 
-(base) txa@zone1:~/keys/appdolivier$ eas build -p android --profile playstore --local
+![Seminar listings](docs/posts/87.png)
 
-(base) txa@zone1:~/keys/appdolivier$ eas credentials
+Built for French osteopathy and medical-training bodies — A.M.O.P.Y. and the SOMOC (Semaine Ostéopathie Médicale Occitane) seminar week among them. The backend is in **[appdolivier-server](https://github.com/ThomasCarstens/appdolivier-server)**.
 
-(base) txa@zone1:~/keys/appdolivier$ java -jar pepk.jar --keystore=keystore.jks --alias=8ecb6fb947a5c1b4fefcbe7ba585727b --output=output.zip --include-cert --rsa-aes-encryption --encryption-key-path=./encryption_public_key.pem
+## What it does
 
-see master branch for FCMv1 key
+Each seminar carries the information a practitioner actually decides on: dates, location, level, price, category, keywords, the competencies it confers, prerequisites, and where to meet on the day. The listing splits into **available**, **past**, and **enrolled**, with search filters over the catalogue.
 
-see master branch for some hours - 20sept : 1h30 security management / 40min email
+The administration side is what made it worth building. Seminar organisers were managing signups by email and spreadsheet; this replaces that with a published catalogue, structured enrolment, and push notifications when something changes.
 
-21sept: 1h email
+## Stack
 
+React Native via **Expo (SDK 51)** with **expo-router**, TypeScript, and React Navigation. Firebase supplies authentication, data, and crash reporting through `@react-native-firebase`. Built and shipped with **EAS** to both stores.
 
-https://appstoreconnect.apple.com
-https://developer.apple.com/
-(base) txa@zone1: eas whoami / login mykeys
+## Working on it
 
-You don't have the required permissions to perform this operation.
+```bash
+npm install
 
-This can sometimes happen if you are logged in as incorrect user.
-Run eas whoami to check the username you are logged in as.
-Run eas login to change the account.
+npm start          # expo start
+npm run android
+npm run ios
+npm run web
 
-Original error message: Entity not authorized: AppEntity[51e2e72b-ed5c-4f8d-bc3e-86e58c5e5370] (viewer = RegularUserViewerContext[c8f58066-ec9d-4cea-87b0-b900211a7128], action = READ, ruleIndex = -1)
-Request ID: 9e61ffaa-0e01-4445-951e-814bedcd9346
-    Error: GraphQL request failed.
+npm run lint
+npm test
+```
+
+| Path | Contents |
+| --- | --- |
+| `app/` | Screens and routes (expo-router file-based routing) |
+| `components/`, `hooks/`, `constants/` | Shared UI and logic |
+| `firebase.js` | Firebase client initialisation |
+| `eas.json`, `app.json` | Build profiles and app configuration |
+| `docs/build-notes.md` | Working notes on EAS builds, Play Store signing and store submission |
+
+## Context
+
+This is one of a series of platforms connecting tutors to students — see also [Kipp_online](https://github.com/ThomasCarstens/Kipp_online) and [UniversityCourseApp](https://github.com/ThomasCarstens/UniversityCourseApp). Building them made something clear that the [educate-me](https://github.com/ThomasCarstens/educate-me) project was a reaction to: these apps help the *teaching* process, not the *learning* process.
+
+---
+
+More project write-ups: [thomascarstens.github.io](https://thomascarstens.github.io) · Questions: thomaxarstens@gmail.com
